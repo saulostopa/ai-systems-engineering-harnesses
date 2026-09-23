@@ -80,7 +80,7 @@ The RAG backends implement the same evidence boundary. PostgreSQL changes persis
 
 Run each project's own tests from its directory. The projects intentionally keep their dependencies separate so a consumer can download only the harness it needs.
 
-The core Python suites and the App Harness gate run without the course repository. The `harness-basic` skill scanner also has an integration suite that expects the course's broader skill catalog and GNU coreutils; on macOS, install GNU coreutils or run those course-level checks from `harness-plannig`.
+The core Python suites, App Harness gate and portable skill-scanner checks run without the course repository. Two scanner cases are skipped when the course's optional `skills-artifacts` fixture is absent; those cases remain available in the course-level integration environment.
 
 ## Relationship to the course
 

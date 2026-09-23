@@ -79,14 +79,25 @@ case "$TIMEOUT" in
   ''|*[!0-9]*) fail "SKILL_GUARD_TIMEOUT must be an integer number of seconds — received: '$TIMEOUT'" ;;
 esac
 
-# `realpath --relative-to` is from GNU coreutils. On BSD/macOS/busybox it does
-# not exist, `rel` would come out empty and the scan would become `scan ./` —
-# the whole repository instead of the skill, diluting exactly the target that
-# was meant to be measured.
-command -v realpath >/dev/null 2>&1 \
-  || fail "realpath missing — the gate requires GNU coreutils"
-realpath --relative-to=/ / >/dev/null 2>&1 \
-  || fail "realpath without --relative-to (non-GNU) — the gate requires GNU coreutils"
+# GNU `realpath --relative-to` is not available on the BSD/macOS variant.
+# Keep the target boundary intact with a Python fallback so the gate remains
+# portable without requiring a second coreutils package.
+relative_path() {
+  local root="$1" target="$2"
+  if command -v realpath >/dev/null 2>&1 \
+    && realpath --relative-to=/ / >/dev/null 2>&1; then
+    realpath --relative-to="$root" "$target"
+  else
+    python3 - "$root" "$target" <<'PY'
+import os
+import sys
+print(os.path.relpath(os.path.realpath(sys.argv[2]), os.path.realpath(sys.argv[1])))
+PY
+  fi
+}
+
+command -v realpath >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 \
+  || fail "realpath or python3 is required to resolve scan targets"
 
 # --- engine ------------------------------------------------------------------
 
@@ -172,7 +183,7 @@ scan_target() {
   local outf="$TMPDIR_RUN/scan.$cname.json"
   if [ -e "$target" ]; then
     # Local path: mounts the repo root and references the target relative to it.
-    rel="$(realpath --relative-to="$SCAN_ROOT" "$target")"
+    rel="$(relative_path "$SCAN_ROOT" "$target")"
     timeout -s KILL "$TIMEOUT" docker run --rm --name "$cname" --sig-proxy=false \
       -v "$SCAN_ROOT:/scan:ro" ${bmount[@]+"${bmount[@]}"} "$IMAGE" \
       scan "./$rel" --no-llm --format json ${base[@]+"${base[@]}"} >"$outf" 2>/dev/null
