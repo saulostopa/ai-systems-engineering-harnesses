@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# pre-push — validates the harness before publishing (Lesson 09/11)
+if ! "$(dirname "$0")/../scripts/validate-harness.sh"; then
+  echo "pre-push: harness invalid — push blocked (or use --no-verify consciously)"
+  exit 1
+fi

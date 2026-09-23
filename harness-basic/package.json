@@ -1,0 +1,15 @@
+{
+  "name": "harness-basic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pacote de harness basico instalavel — AGENTS.md, policies, hooks mecanicos e validacao para projetos pequenos (Webmotors).",
+  "files": [
+    "templates",
+    ".githooks",
+    "scripts"
+  ],
+  "scripts": {
+    "install": "bash install.sh",
+    "validate": "bash scripts/validate-harness.sh"
+  }
+}

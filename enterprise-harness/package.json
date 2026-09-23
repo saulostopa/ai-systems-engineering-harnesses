@@ -1,0 +1,13 @@
+{
+  "name": "@webmotors/enterprise-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise harness orchestrator (layer A): adopt repositories, run flows, aggregate across teams. Stores no project state.",
+  "scripts": {
+    "validate": "bash scripts/validate-enterprise-harness.sh",
+    "test": "bash tests/test_enterprise_harness.sh"
+  },
+  "bin": {
+    "wm-harness": "bin/wm-harness"
+  }
+}

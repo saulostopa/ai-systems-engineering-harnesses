@@ -1,0 +1,22 @@
+[
+  {
+    "query": "como o gatekeeper bloqueia commit sem feature",
+    "expected_path": "harness-basic/scripts/gatekeeper.sh"
+  },
+  {
+    "query": "o que conta como evidencia antes do done",
+    "expected_path": "harness-basic/templates/policies/evidence-required.md"
+  },
+  {
+    "query": "definicao de pronto verificavel",
+    "expected_path": "harness-basic/templates/policies/definition-of-done.md"
+  },
+  {
+    "query": "instalador que ativa core.hooksPath",
+    "expected_path": "harness-basic/install.sh"
+  },
+  {
+    "query": "como registrar friccao do harness",
+    "expected_path": "harness-basic/scripts/log-event.sh"
+  }
+]

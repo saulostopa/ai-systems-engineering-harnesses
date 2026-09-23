@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.rag_index/
+.intranet_index/
+.adk/
+node_modules/
+dist/
+build/
+
+.area_index/

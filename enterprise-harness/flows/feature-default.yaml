@@ -1,0 +1,30 @@
+# feature-default — the ordinary path for a feature.
+# Read by the orchestrator when it seeds an execution plan: these steps and
+# criteria become the plan's checklist, so a flow is a mechanism and not a
+# document somebody is supposed to remember.
+name: feature-default
+description: Plan, build, prove, review, close — the default flow for a feature.
+
+steps:
+  - Declare the scope and open the feature in feature_list.json
+  - Implement the change, staying inside the declared scope
+  - Cover the change with tests
+  - Record the evidence (command, expected, actual)
+  - Generate the delivery artifacts (./scripts/artifacts.sh <plan-id>)
+  - Review the diff against the declared scope
+  - Close: update progress.md and session-handoff.md
+
+exit_criteria:
+  - build green
+  - full test suite passing, with no reduction in coverage
+  - diff limited to the declared scope
+  - evidence recorded with real command output
+  - delivery artifacts rendered and validated (diagram, report, quiz)
+
+# What the delivery owes beyond code. `wm-harness plan done` refuses to archive
+# a plan whose declared artifacts are missing — the diagram stops depending on
+# somebody remembering it.
+artifacts:
+  - diagram
+  - report
+  - quiz

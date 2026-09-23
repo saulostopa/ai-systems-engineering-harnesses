@@ -1,0 +1,114 @@
+/* eleanor-theme.css — Webmotors palette for an Archify artifact.
+ *
+ * Archify has no theming field in its schema: `visual_preset` offers four fixed
+ * looks and `brandMark` is a per-node logo. What it does expose is 38 CSS custom
+ * properties in the delivered HTML, so the palette is overridable without
+ * touching geometry — which matters, because geometry is what the composition
+ * validator checked. Colour changes cannot invalidate a layout that already
+ * passed; contrast is on us, and every number below was measured by
+ * scripts/check-contrast.py, not guessed.
+ *
+ * SELECTORS: archify scopes its palette as `[data-preset="<name>"][data-theme=
+ * "<mode>"]`, which outranks a bare `:root`. Overriding only `:root` looks like
+ * it works and changes nothing — the artifact keeps rendering in archify's own
+ * colours. Every preset/mode pair has to be named here.
+ *
+ * BOTH MODES: Eleanor is a two-mode system and the artifact has a working
+ * light/dark toggle. Shipping only the dark palette would turn that toggle into
+ * a no-op, so light is defined too.
+ *
+ * Applied by scripts/artifacts.sh after `archify deliver`.
+ * Source of truth for the tokens: webmotors.ds.eleanor.tokens.
+ */
+
+/* ═══ DARK — background #0a0a0c ═══ */
+:root,
+[data-theme="dark"],
+[data-preset="classic"][data-theme="dark"],
+[data-preset="signal-flow"][data-theme="dark"],
+[data-preset="blueprint"][data-theme="dark"],
+[data-preset="editorial"][data-theme="dark"] {
+  --bg: #0a0a0c;
+  --grid: #262629;
+  --mask: #171719;
+  --panel: rgba(23, 23, 25, 0.62);
+  --panel-border: #3f3f47;
+  --lane-fill: rgba(23, 23, 25, 0.3);
+  --lane-stroke: #62626a;
+
+  --text: #ffffff;
+  --text-muted: #a2a2a9;
+  --text-dim: #8b8b93;
+  --text-faint: #8f8f97;
+
+  --arrow: #72727a;
+  --arrow-emphasis: #e53858;
+
+  /* Eleanor has one accent and a diagram needs several distinguishable
+     families. Red stays on the primary path; the rest are Eleanor greys and
+     indigo, so nothing reads as a second brand colour. */
+  --frontend-fill: rgba(216, 31, 65, 0.18);
+  --frontend-stroke: #e53858;
+  --backend-fill: rgba(228, 87, 112, 0.14);
+  --backend-stroke: #e45770;
+  --database-fill: rgba(118, 118, 180, 0.18);
+  --database-stroke: #7676b4;
+  --cloud-fill: rgba(162, 162, 169, 0.14);
+  --cloud-stroke: #a2a2a9;
+  --security-fill: rgba(216, 31, 65, 0.24);
+  --security-stroke: #d81f41;
+  --messagebus-fill: rgba(154, 154, 208, 0.12);
+  --messagebus-stroke: #9a9ad0;
+  --external-fill: rgba(38, 38, 41, 0.55);
+  --external-stroke: #72727a;
+
+  --toolbar-bg: rgba(23, 23, 25, 0.86);
+  --toolbar-border: #3f3f47;
+  --toolbar-text: #f4f4f8;
+  --toolbar-hover: rgba(38, 38, 41, 0.95);
+  --toolbar-menu-bg: #171719;
+}
+
+/* ═══ LIGHT — background #ffffff ═══ */
+[data-theme="light"],
+[data-preset="classic"][data-theme="light"],
+[data-preset="signal-flow"][data-theme="light"],
+[data-preset="blueprint"][data-theme="light"],
+[data-preset="editorial"][data-theme="light"] {
+  --bg: #ffffff;
+  --grid: #e4e4ea;
+  --mask: #f4f4f8;
+  --panel: rgba(244, 244, 248, 0.72);
+  --panel-border: #d3d3d9;
+  --lane-fill: rgba(244, 244, 248, 0.45);
+  --lane-stroke: #8f8f97;
+
+  --text: #0a0a0c;
+  --text-muted: #515159;
+  --text-dim: #5f5f67;
+  --text-faint: #66666e;
+
+  --arrow: #72727a;
+  --arrow-emphasis: #d81f41;
+
+  --frontend-fill: rgba(216, 31, 65, 0.1);
+  --frontend-stroke: #d81f41;
+  --backend-fill: rgba(216, 31, 65, 0.06);
+  --backend-stroke: #b01834;
+  --database-fill: rgba(76, 76, 160, 0.1);
+  --database-stroke: #4c4ca0;
+  --cloud-fill: rgba(114, 114, 122, 0.1);
+  --cloud-stroke: #5f5f67;
+  --security-fill: rgba(216, 31, 65, 0.14);
+  --security-stroke: #a3162f;
+  --messagebus-fill: rgba(76, 76, 160, 0.07);
+  --messagebus-stroke: #3b3b7d;
+  --external-fill: rgba(228, 228, 234, 0.6);
+  --external-stroke: #72727a;
+
+  --toolbar-bg: rgba(255, 255, 255, 0.9);
+  --toolbar-border: #d3d3d9;
+  --toolbar-text: #0a0a0c;
+  --toolbar-hover: rgba(244, 244, 248, 0.95);
+  --toolbar-menu-bg: #ffffff;
+}

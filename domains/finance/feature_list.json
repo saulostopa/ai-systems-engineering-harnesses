@@ -1,0 +1,25 @@
+{
+  "features": [
+    {
+      "id": "fin-001",
+      "title": "Daily sales summary (nightly pipeline)",
+      "description": "Reconciliation of targets vs. sales by region, published at 6am with cited sources.",
+      "status": "not_started",
+      "priority": 1
+    },
+    {
+      "id": "fin-002",
+      "title": "Divergence detection in spreadsheets",
+      "description": "Automatic alerts for totals that do not match, with the cited line of each divergence.",
+      "status": "not_started",
+      "priority": 2
+    },
+    {
+      "id": "fin-003",
+      "title": "Weekly pricing report",
+      "description": "Analysis of applied discounts vs. the pricing rule (used vehicles), with outliers.",
+      "status": "not_started",
+      "priority": 3
+    }
+  ]
+}

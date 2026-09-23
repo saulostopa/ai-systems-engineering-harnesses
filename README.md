@@ -1,0 +1,89 @@
+# Harnesses
+
+Standalone harness projects for reliable AI-assisted development. This repository contains the runnable projects from the Harness Foundation Course without the course website, lessons, or planning artifacts.
+
+Each directory is independently usable. Start with `harness-basic` for a small project, use `app-harness` or `domains` for extensions, and choose one of the RAG projects when the agent needs repository or business context.
+
+## Catalog
+
+| Project | Use it for | Start here |
+|---|---|---|
+| `harness-basic` | Installable policies, templates, hooks, and gates | `./harness-basic/install.sh <project>` |
+| `app-harness` | E2E and agentic navigation checks | `app-harness/README.md` |
+| `domains` | Finance, games, and commercial domain packs | Domain-specific pack |
+| `rag-harness` | Local hybrid RAG with JSON index and Ollama embeddings | `rag-harness/rag_harness/__main__.py` |
+| `area-copilot` | Business context with cited sources | `area-copilot/area_harness/__main__.py` |
+| `hard-harness` | Executable graphs, gates, and evidence | `hard-harness/README.md` |
+| `enterprise-harness` | Multi-repository orchestration | `enterprise-harness/README.md` |
+| `adk-rag-harness` | ADK + RAG + Jev with local or OpenRouter decisions | `adk-rag-harness/README.md` |
+| `adk-rag-postgres-harness` | Shared PostgreSQL + pgvector RAG | `adk-rag-postgres-harness/README.md` |
+| `artifacts-intranet` | Searchable shared artifact context | `artifacts-intranet/README.md` |
+
+## Quick starts
+
+### Basic harness
+
+```bash
+./harness-basic/install.sh /path/to/your-project
+```
+
+### Local RAG
+
+```bash
+ollama pull nomic-embed-text
+cd rag-harness
+RAG_EMBEDDER=ollama OLLAMA_EMBED_MODEL=nomic-embed-text \
+python3 -m rag_harness index /path/to/your-repository --verbose
+```
+
+### ADK + RAG + Jev
+
+```bash
+cd adk-rag-harness
+uv sync --extra adk --extra ollama --extra jev-sdk
+HARNESS_RAG_PROVIDER=demo uv run adk web
+```
+
+For a real local index, point the indexer at the target repository and pass the resulting index path to the ADK app:
+
+```bash
+RAG_EMBEDDER=ollama OLLAMA_EMBED_MODEL=nomic-embed-text \
+PYTHONPATH=rag-harness python3 -m rag_harness index /path/to/your-repository --verbose
+HARNESS_RAG_PROVIDER=rag-harness \
+HARNESS_RAG_DOCS_INDEX=/path/to/your-repository/.rag_index \
+uv run adk web
+```
+
+### ADK RAG with PostgreSQL
+
+```bash
+cd adk-rag-postgres-harness
+uv sync --extra postgres
+docker compose up -d postgres
+uv run python -m adk_rag_postgres_harness.cli migrate
+```
+
+See the project README before ingesting a collection.
+
+## Choosing a project
+
+- Use `harness-basic` when the project needs a small, installable control layer.
+- Use `rag-harness` when one developer or a small project can keep the index locally.
+- Use `adk-rag-harness` when typed routing, Jev, and ADK traces are useful.
+- Use `adk-rag-postgres-harness` when multiple people or services share the index.
+- Use `enterprise-harness` when one orchestrator manages several repositories.
+- Use `hard-harness` when executable graph control and deterministic gates are the main goal.
+
+The RAG backends implement the same evidence boundary. PostgreSQL changes persistence and retrieval scale; it does not replace typed workflow validation.
+
+## Validation
+
+Run each project's own tests from its directory. The projects intentionally keep their dependencies separate so a consumer can download only the harness it needs.
+
+## Relationship to the course
+
+The course, explanations, architecture decisions, and bilingual documentation remain in [harness-plannig](https://github.com/svslwm/harness-plannig). This repository is the distribution surface for the runnable harness projects.
+
+## License
+
+Add the license required by the organization before publishing a production distribution.

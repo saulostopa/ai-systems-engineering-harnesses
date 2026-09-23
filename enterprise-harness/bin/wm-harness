@@ -1,0 +1,328 @@
+#!/usr/bin/env bash
+# wm-harness — the enterprise harness orchestrator (layer A).
+#
+# Installed once per machine, in a root folder above the project folders.
+# It owns the HOW: flow definitions, the adoption procedure, cross-project
+# aggregation. It owns no project state — every byte of that lives in each
+# repository, in the PR, reviewable.
+#
+#   wm-harness adopt <repo> [--flow NAME]   install layer B into a repository
+#   wm-harness list                          adopted repositories found
+#   wm-harness status [repo]                 what each project is working on
+#   wm-harness check [repo]                  run each project's own gates
+#   wm-harness plan new <id> <title>         start a plan (id: feature/OEM-123)
+#   wm-harness plan done <id>                archive a finished plan
+#   wm-harness report                        cross-project aggregation
+#   wm-harness flows                         available flow definitions
+#   wm-harness doctor                        verify this installation
+set -uo pipefail
+
+HOME_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../engine/lib.sh
+. "$HOME_DIR/engine/lib.sh"
+
+VERSION="$(cat "$HOME_DIR/VERSION" 2>/dev/null || echo "0.0.0-dev")"
+
+# BSD sed (macOS) requires a backup suffix for in-place edits, while GNU sed
+# accepts an empty suffix. Keep the CLI portable without leaving backup files.
+replace_in_place() {
+  sed -i.bak "$1" "$2" && rm -f "$2.bak"
+}
+
+usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# ── adopt ───────────────────────────────────────────────────────────────
+# Layer B and nothing more: the skeleton, the policies, the mechanical hooks,
+# the exec-plans structure and one config file. No engine, no node_modules,
+# no database lands in the repository.
+cmd_adopt() {
+  local repo="" flow="feature-default" force=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --flow) flow="${2:-}"; shift 2 ;;
+      --force) force="--force"; shift ;;
+      -*) die "unknown option: $1" ;;
+      *) repo="$1"; shift ;;
+    esac
+  done
+  [ -n "$repo" ] || die "usage: wm-harness adopt <repo> [--flow NAME]"
+  [ -d "$repo" ] || die "directory does not exist: $repo"
+  flow_exists "$flow" || die "unknown flow: $flow (see: wm-harness flows)"
+  repo="$(cd "$repo" && pwd)"
+
+  say "Adopting $repo (flow: $flow)"
+
+  # Layers 1-2 come from the basic harness, vendored with the orchestrator.
+  # The enterprise harness wraps the basic one; it never reimplements it.
+  local basic="$HOME_DIR/harness-basic/install.sh"
+  [ -f "$basic" ] || die "vendored harness-basic missing from $HOME_DIR — reinstall the orchestrator"
+  bash "$basic" "$repo" $force || die "basic harness installation failed"
+
+  mkdir -p "$repo/.harness"
+  local cfg="$repo/.harness/config.yaml"
+  if [ -f "$cfg" ] && [ -z "$force" ]; then
+    warn "kept existing .harness/config.yaml (use --force to overwrite)"
+  else
+    sed -e "s|{{NAME}}|$(basename "$repo")|" \
+        -e "s|{{FLOW}}|$flow|" \
+        -e "s|{{ENGINE}}|$VERSION|" \
+        "$HOME_DIR/templates/harness-config.yaml" > "$cfg"
+    ok "wrote .harness/config.yaml"
+  fi
+
+  say "Done. The project now carries its own scope, plans and evidence."
+  say "Next: wm-harness status $repo"
+}
+
+# ── list ────────────────────────────────────────────────────────────────
+cmd_list() {
+  local root n=0
+  root="$(projects_root)"
+  say "Scanning $root"
+  while read -r repo; do
+    [ -n "$repo" ] || continue
+    n=$((n + 1))
+    printf '  %-28s %s\n' "$(project_name "$repo")" "$repo"
+  done < <(discover_projects)
+  [ "$n" -eq 0 ] && say "no adopted repository found (wm-harness adopt <repo>)"
+  return 0
+}
+
+# ── status ──────────────────────────────────────────────────────────────
+status_one() {
+  local repo="$1"
+  printf '\n%s  (%s)\n' "$(project_name "$repo")" "$repo"
+  printf '  flow: %s\n' "$(config_get "$repo" flow 2>/dev/null || echo '-')"
+  printf '  features: %s in_progress · %s blocked · %s passing\n' \
+    "$(feature_count "$repo" in_progress)" \
+    "$(feature_count "$repo" blocked)" \
+    "$(feature_count "$repo" passing)"
+  printf '  plans: %s active · %s done\n' \
+    "$(plan_count "$repo" active)" "$(plan_count "$repo" done)"
+  local d="$repo/docs/exec-plans/active"
+  if [ -d "$d" ]; then
+    while read -r p; do
+      [ -n "$p" ] || continue
+      printf '    · %-34s %s\n' "$(basename "$p")" "$(plan_status "$p")"
+    done < <(find "$d" -maxdepth 1 -name '*.md' 2>/dev/null | sort)
+  fi
+}
+
+cmd_status() {
+  if [ $# -gt 0 ]; then
+    [ -d "$1" ] || die "directory does not exist: $1"
+    status_one "$(cd "$1" && pwd)"
+    return 0
+  fi
+  local n=0
+  while read -r repo; do
+    [ -n "$repo" ] || continue
+    n=$((n + 1)); status_one "$repo"
+  done < <(discover_projects)
+  [ "$n" -eq 0 ] && say "no adopted repository found"
+  return 0
+}
+
+# ── check ───────────────────────────────────────────────────────────────
+# Runs the gates that live IN each repository. The orchestrator does not own
+# a second copy of the rules — it just makes running them across projects easy.
+cmd_check() {
+  local repos=() failures=0
+  if [ $# -gt 0 ]; then
+    [ -d "$1" ] || die "directory does not exist: $1"
+    repos+=("$(cd "$1" && pwd)")
+  else
+    while read -r r; do [ -n "$r" ] && repos+=("$r"); done < <(discover_projects)
+  fi
+  [ "${#repos[@]}" -gt 0 ] || { say "no adopted repository found"; return 0; }
+
+  for repo in "${repos[@]}"; do
+    section "$(project_name "$repo")"
+    local v="$repo/scripts/validate-harness.sh"
+    if [ ! -f "$v" ]; then
+      bad "no scripts/validate-harness.sh — repository not fully adopted"
+      failures=$((failures + 1)); continue
+    fi
+    if bash "$v" >/dev/null 2>&1; then
+      ok "harness healthy"
+    else
+      bad "harness broken — run: bash $v"
+      failures=$((failures + 1))
+    fi
+    local flow; flow="$(config_get "$repo" flow 2>/dev/null)"
+    if [ -n "$flow" ] && ! flow_exists "$flow"; then
+      bad "declared flow '$flow' does not exist in this orchestrator"
+      failures=$((failures + 1))
+    fi
+  done
+
+  section "Result"
+  printf '%s — %d project(s), %d failure(s)\n' \
+    "$( [ "$failures" -eq 0 ] && echo "ALL HEALTHY" || echo "ATTENTION NEEDED" )" \
+    "${#repos[@]}" "$failures"
+  return "$failures"
+}
+
+# ── plan ────────────────────────────────────────────────────────────────
+repo_here() {
+  local d; d="$(pwd)"
+  while [ "$d" != "/" ]; do
+    [ -f "$d/.harness/config.yaml" ] && { printf '%s\n' "$d"; return 0; }
+    d="$(dirname "$d")"
+  done
+  die "not inside an adopted repository (no .harness/config.yaml found)"
+}
+
+cmd_plan() {
+  local sub="${1:-}"; shift || true
+  local repo; repo="$(repo_here)" || exit 1
+  case "$sub" in
+    new)
+      local id="${1:-}" title="${2:-}"
+      [ -n "$id" ] || die "usage: wm-harness plan new <id> <title>   (id: feature/OEM-123)"
+      local flow; flow="$(config_get "$repo" flow 2>/dev/null || echo feature-default)"
+      flow_exists "$flow" || die "the repository declares an unknown flow: $flow"
+      local out="$repo/docs/exec-plans/active/$(plan_slug "$id").md"
+      [ -e "$out" ] && die "plan already exists: $out"
+      mkdir -p "$(dirname "$out")"
+
+      # Steps and exit criteria come from the flow — that is what makes a flow
+      # definition a mechanism instead of documentation.
+      {
+        printf -- '---\nid: %s\nstatus: not_started\nflow: %s\nexit_criteria:\n' "$id" "$flow"
+        flow_items "$(flow_file "$flow")" exit_criteria | sed 's/^/  - /'
+        printf -- '---\n\n# %s — %s\n\n## Scope\n\nDeclared before any edit (policies/scope-control.md).\n\n- _files this plan may touch_\n\nOut of scope: _what will explicitly NOT be touched_\n\n## Steps\n\n' "$id" "${title:-<title>}"
+        flow_items "$(flow_file "$flow")" steps | nl -w1 -s'. [ ] '
+        printf -- '\n## Blockers\n\n- None\n\n## Evidence\n\nRequired before `status: done` — command, expected, actual, with real output.\n\n| Command | Expected | Actual |\n|---|---|---|\n| | | |\n'
+      } > "$out"
+      ok "created $out (flow: $flow)"
+      ;;
+    done)
+      local id="${1:-}"
+      [ -n "$id" ] || die "usage: wm-harness plan done <id>"
+      local slug; slug="$(plan_slug "$id")"
+      local src="$repo/docs/exec-plans/active/${slug}.md"
+      [ -f "$src" ] || die "no active plan with id '$id'"
+      # The gate would catch both of these later; catching them here means the
+      # mistake never reaches a commit.
+      grep -qiE '^#+[[:space:]]*(evidence|evid.ncia)' "$src" \
+        || die "$id has no Evidence section — a plan cannot reach done without it"
+      grep -qE '^\|[^|]+\|[^|]+\|[[:space:]]*_?pending_?[[:space:]]*\|' "$src" \
+        && die "$id still has pending evidence rows — fill them before archiving"
+
+      # Artifacts the flow declares are part of the delivery, not a nicety. A
+      # diagram nobody is forced to produce is a diagram that stops being
+      # produced by the third sprint.
+      local flow; flow="$(config_get "$repo" flow 2>/dev/null || echo feature-default)"
+      if flow_exists "$flow"; then
+        while read -r art; do
+          [ -n "$art" ] || continue
+          case "$art" in
+            diagram)
+              [ -f "$repo/docs/artifacts/${slug}.html" ] \
+                || die "$id owes a delivery diagram (flow '$flow') — run: ./scripts/artifacts.sh $id" ;;
+            report)
+              [ -f "$repo/docs/artifacts/${slug}-report.html" ] \
+                || die "$id owes a delivery report (flow '$flow') — the feature-report skill writes docs/artifacts/${slug}-report.html" ;;
+            quiz)
+              [ -f "$repo/docs/artifacts/${slug}-quiz.html" ] \
+                || die "$id owes a delivery quiz (flow '$flow') — the feature-quiz skill writes docs/artifacts/${slug}-quiz.html" ;;
+            animation)
+              [ -f "$repo/docs/artifacts/${slug}-animation.html" ] \
+                || die "$id owes a delivery animation (flow '$flow') — the feature-animation skill writes docs/artifacts/${slug}-animation.html" ;;
+            *) warn "flow '$flow' declares an artifact this version does not know: $art" ;;
+          esac
+        done < <(flow_items "$(flow_file "$flow")" artifacts)
+      fi
+      replace_in_place 's/^status:[[:space:]]*.*$/status: done/' "$src"
+      mkdir -p "$repo/docs/exec-plans/done"
+      mv "$src" "$repo/docs/exec-plans/done/${slug}.md"
+      ok "archived to docs/exec-plans/done/${slug}.md"
+      ;;
+    ""|-h|--help) echo "usage: wm-harness plan {new <id> <title>|done <id>}" ;;
+    *) die "unknown subcommand: plan $sub" ;;
+  esac
+}
+
+# ── report ──────────────────────────────────────────────────────────────
+# Aggregation is the one thing that genuinely belongs to layer A: no single
+# repository can see across teams. Note it only READS — the numbers are
+# recomputed from the repositories every time, never cached here.
+cmd_report() {
+  local projects=0 inprog=0 blocked=0 passing=0 active=0 done=0 friction=0
+  printf '\n%-24s %8s %8s %8s %8s %8s\n' "PROJECT" "IN_PROG" "BLOCKED" "PASSING" "ACTIVE" "DONE"
+  printf '%s\n' "----------------------------------------------------------------------"
+  while read -r repo; do
+    [ -n "$repo" ] || continue
+    projects=$((projects + 1))
+    local i b p a d
+    i="$(feature_count "$repo" in_progress)"; b="$(feature_count "$repo" blocked)"
+    p="$(feature_count "$repo" passing)"
+    a="$(plan_count "$repo" active)";        d="$(plan_count "$repo" done)"
+    printf '%-24s %8s %8s %8s %8s %8s\n' "$(project_name "$repo")" "$i" "$b" "$p" "$a" "$d"
+    [ "$i" = "?" ] || inprog=$((inprog + i))
+    [ "$b" = "?" ] || blocked=$((blocked + b))
+    [ "$p" = "?" ] || passing=$((passing + p))
+    active=$((active + a)); done=$((done + d))
+    local logs="$repo/.harness/logs"
+    if [ -d "$logs" ]; then
+      local n; n="$(grep -ho '`friction`' "$logs"/*.md 2>/dev/null | wc -l | tr -d ' ')"
+      friction=$((friction + n))
+    fi
+  done < <(discover_projects)
+  printf '%s\n' "----------------------------------------------------------------------"
+  printf '%-24s %8s %8s %8s %8s %8s\n' "TOTAL ($projects)" "$inprog" "$blocked" "$passing" "$active" "$done"
+  printf '\nfriction events recorded: %s\n' "$friction"
+  printf 'source: each repository, read live — this orchestrator stores nothing\n'
+}
+
+# ── flows / doctor ──────────────────────────────────────────────────────
+cmd_flows() {
+  local n=0
+  while read -r f; do
+    [ -n "$f" ] || continue
+    n=$((n + 1))
+    printf '\n%s\n' "$f"
+    printf '  steps:          %s\n' "$(flow_items "$(flow_file "$f")" steps | wc -l | tr -d ' ')"
+    printf '  exit criteria:  %s\n' "$(flow_items "$(flow_file "$f")" exit_criteria | wc -l | tr -d ' ')"
+  done < <(list_flows)
+  [ "$n" -eq 0 ] && say "no flow defined"
+  return 0
+}
+
+cmd_doctor() {
+  local failures=0
+  section "Orchestrator (layer A)"
+  printf '  home:          %s\n' "$HOME_DIR"
+  printf '  version:       %s\n' "$VERSION"
+  printf '  projects root: %s\n' "$(projects_root)"
+  for p in engine/lib.sh templates/harness-config.yaml harness-basic/install.sh; do
+    if [ -e "$HOME_DIR/$p" ]; then ok "present: $p"; else bad "missing: $p"; failures=$((failures + 1)); fi
+  done
+  local nf; nf="$(list_flows | wc -l | tr -d ' ')"
+  if [ "$nf" -gt 0 ]; then ok "$nf flow definition(s)"; else bad "no flow defined"; failures=$((failures + 1)); fi
+  if [ -d "$(projects_root)" ]; then ok "projects root exists"; else bad "projects root does not exist"; failures=$((failures + 1)); fi
+
+  section "Adopted projects"
+  local n; n="$(discover_projects | wc -l | tr -d ' ')"
+  ok "$n repository/repositories discovered"
+
+  section "Result"
+  printf '%s — %d failure(s)\n' "$( [ "$failures" -eq 0 ] && echo "ORCHESTRATOR OK" || echo "ORCHESTRATOR BROKEN" )" "$failures"
+  return "$failures"
+}
+
+# ── dispatch ────────────────────────────────────────────────────────────
+case "${1:-}" in
+  adopt)  shift; cmd_adopt "$@" ;;
+  list)   shift; cmd_list "$@" ;;
+  status) shift; cmd_status "$@" ;;
+  check)  shift; cmd_check "$@" ;;
+  plan)   shift; cmd_plan "$@" ;;
+  report) shift; cmd_report "$@" ;;
+  flows)  shift; cmd_flows "$@" ;;
+  doctor) shift; cmd_doctor "$@" ;;
+  -V|--version) echo "wm-harness $VERSION" ;;
+  ""|-h|--help) usage ;;
+  *) die "unknown command: $1 (try: wm-harness --help)" ;;
+esac
