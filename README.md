@@ -17,6 +17,7 @@ Each directory is independently usable. Start with `harness-basic` for a small p
 | `enterprise-harness` | Multi-repository orchestration | `enterprise-harness/README.md` |
 | `adk-rag-harness` | ADK + RAG + Jev with 4-pillar operational decisions | `adk-rag-harness/README.md` |
 | `adk-rag-postgres-harness` | Shared PostgreSQL + pgvector RAG | `adk-rag-postgres-harness/README.md` |
+| `harness-usage` | Token and cost ledger, budget warning and reports for the LLM harnesses | `harness-usage/README.md` |
 
 | `artifacts-intranet` | Searchable shared artifact context | `artifacts-intranet/README.md` |
 
