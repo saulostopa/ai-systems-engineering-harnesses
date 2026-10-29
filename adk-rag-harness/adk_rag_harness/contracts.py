@@ -13,6 +13,31 @@ class QuestionType(str, Enum):
     SCORE = "score"
 
 
+class ModelTier(str, Enum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
+class ToolActionDecision(str, Enum):
+    ALLOW = "allow"
+    ASK = "ask"
+    DENY = "deny"
+
+
+class ActionGate(str, Enum):
+    EXECUTE = "execute"
+    CONFIRM = "confirm"
+    HUMAN_REVIEW = "human_review"
+
+
+@dataclass(frozen=True)
+class GuardrailResult:
+    is_safe: bool
+    confidence: float
+    reason: str = ""
+
+
 @dataclass(frozen=True)
 class DecisionQuestion:
     name: str

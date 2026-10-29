@@ -4,11 +4,20 @@ The harness keeps the decision contract and retrieval boundary independent of
 Google ADK and the Jev provider. It can run offline with fake providers, which
 makes policy behavior testable before adding network clients.
 
-The intended runtime flow is:
+It implements the operational decision principles ("The LLM writes, Jev decides"):
 
 ```text
-request → decision provider → policy code → RAG adapter → evidence gate
+request
+  │
+  ├─► [ Jev Guardrail (Filter) ] ── (abusive/injection) ──► blocked (0 LLM tokens)
+  │
+  ├─► [ Jev Model Router (Route) ] ──► Small ($) vs. Large ($$$) tier
+  │
+  ├─► RAG adapter ──► [ Jev Reranker (Score) ] ──► top-K evidence chunks
+  │
+  └─► [ Tripartite Policy (Release) ] ──► execute / confirm / human escalation
 ```
+
 
 The dependency-free Jev adapter targets TypeSafe's `/v1/systemone` contract and
 accepts an injected transport for offline tests. `TypeSafeSdkDecisionProvider`
@@ -36,63 +45,116 @@ HARNESS_RAG_PROVIDER=demo uv run adk web
 HARNESS_RAG_PROVIDER=rag-harness uv run adk web
 ```
 
-Create an index for a target repository before using `rag-harness`:
+Create one index per collection for the target repository before using
+`rag-harness`. The `docs` profile indexes `.md .txt .yaml .yml .json`; the
+`code` profile indexes `.py .sh .ts .tsx .js .mjs`:
 
 ```bash
-ollama pull nomic-embed-text
-RAG_EMBEDDER=ollama OLLAMA_EMBED_MODEL=nomic-embed-text \
-PYTHONPATH=../rag-harness python3 -m rag_harness index /path/to/your-repository --verbose
+RAG_EMBEDDER=openrouter OPENROUTER_EMBED_MODEL=voyageai/voyage-code-4 \
+PYTHONPATH=../rag-harness python3 -m rag_harness index /path/to/your-repository --profile docs --verbose
+RAG_EMBEDDER=openrouter OPENROUTER_EMBED_MODEL=voyageai/voyage-code-4 \
+PYTHONPATH=../rag-harness python3 -m rag_harness index /path/to/your-repository --profile code --verbose
 ```
 
-Point the provider at that index before starting the app:
+Point each collection at its index before starting the app. Only the
+collections with an index are offered to the decision provider, so it can
+never route to a collection that has no evidence:
 
 ```bash
 HARNESS_RAG_PROVIDER=rag-harness \
-HARNESS_RAG_DOCS_INDEX=/path/to/your-repository/.rag_index \
+HARNESS_RAG_DOCS_INDEX=/path/to/your-repository/.rag_index/docs \
+HARNESS_RAG_CODE_INDEX=/path/to/your-repository/.rag_index/code \
+RAG_EMBEDDER=openrouter \
 uv run adk web
 ```
 
-The generated index stays local and should be ignored by Git. The real provider
-returns `blocked` when the index is missing or retrieval fails, rather than
-allowing the model to invent evidence.
+`HARNESS_RAG_AREA_INDEX` adds the `area` collection. Without any of the three
+variables the app falls back to a single `docs` collection.
 
-For an offline architecture check without Ollama, use
-`RAG_EMBEDDER=ngram`. It is deterministic but less semantically expressive;
-delete and recreate the index whenever the embedding model changes.
+The generated index stays local and should be ignored by Git (`.rag_index/`).
+The real provider returns `blocked` when the index is missing or retrieval
+fails, rather than allowing the model to invent evidence.
 
-To run the complete local-evidence test with OpenRouter decisions:
+### Which files are indexed
+
+Inside a Git repository only the files Git tracks or would track are indexed
+(`git ls-files --cached --others --exclude-standard`), so everything in
+`.gitignore` (native folders, build output, `.env`) stays out. Lockfiles such
+as `package-lock.json`, `yarn.lock` and `pnpm-lock.yaml` are always skipped,
+and so are hidden folders. A `.ragignore` file at the repository root adds
+project-specific exclusions with gitignore-like patterns (`!` negation is not
+supported):
+
+```text
+# large data dump, not useful as evidence
+database/exercises.ts
+generated/
+*.min.js
+```
+
+### Embedding providers
+
+`RAG_EMBEDDER` selects the embedding model, and it must be the same when
+indexing and when querying:
+
+| Value | Model | Notes |
+|---|---|---|
+| `openrouter` | `OPENROUTER_EMBED_MODEL`, default `voyageai/voyage-code-4` | Hosted and billed per token; reads the same OpenRouter key as the app |
+| `ollama` | `OLLAMA_EMBED_MODEL`, default `nomic-embed-text` | Local; requires `ollama pull nomic-embed-text` |
+| `ngram` | Deterministic n-gram hashing | Offline architecture checks only; not semantic |
+
+Without `RAG_EMBEDDER` the indexer uses Ollama when it is reachable and
+n-grams otherwise; it never selects a billed provider automatically. Each
+index records its embedder in `meta.json`. Re-indexing embeds only the chunks
+whose content changed, while a different embedder triggers a full re-index.
+Querying an index with another embedder fails closed instead of comparing
+incompatible vectors.
+
+To run the complete local-evidence test:
 
 ```bash
-HARNESS_DECISION_PROVIDER=openrouter-system-one \
-HARNESS_RAG_PROVIDER=rag-harness \
-uv run adk web
+HARNESS_RAG_PROVIDER=rag-harness uv run adk web
 ```
 
 ## Run the ADK app
 
-The `adk_app/agent.py` entrypoint uses Ollama locally by default. The
-conversation model is `llama3.1:8b`; typed routing decisions use
-`qwen2.5:14b`, which can be changed independently:
+The `adk_app/agent.py` entrypoint uses OpenRouter with Jev
+(`typesafe/jev-router`) by default, for both the conversation model and the
+typed routing decisions. The only requirement is an OpenRouter key:
 
 ```bash
-uv sync --extra adk --extra ollama --extra jev-sdk
+uv sync --extra adk --extra openrouter
 uv run adk web
 ```
 
 Open `http://localhost:8000`, select `adk_app`, and try a request such as
-`find the deployment policy`. The app uses Ollama by default through
-`http://localhost:11434` and the
-`llama3.1:8b` model. Set `OLLAMA_MODEL` to another locally installed model
-when needed. Set `HARNESS_DECISION_PROVIDER=demo` for the deterministic demo or
-`HARNESS_DECISION_PROVIDER=jev` with `HARNESS_OFFLINE=0` and
-`TYPESAFE_API_KEY` for official Jev routing.
+`find the deployment policy`. The project pins Python 3.14 in
+`.python-version` because some LiteLLM dependencies have no wheels for newer
+interpreters yet.
+
+When `OPENROUTER_API_KEY` is absent, the app reads the `openrouter.key` entry
+from `~/.local/share/opencode/auth.json` (or `OPENROUTER_AUTH_FILE`) and falls
+back to `opencode.key`. The auth file is never copied into the repository or
+printed. Jev Router chooses the underlying model per request, so its cost per
+call varies.
+
+## Conversation model modes
+
+Select the conversation model with `HARNESS_CHAT_PROVIDER`:
 
 ```bash
-OLLAMA_MODEL=mistral-small3.1 HARNESS_OFFLINE=0 uv run adk web
+# Default: OpenRouter, OPENROUTER_CHAT_MODEL=typesafe/jev-router
+uv run adk web
+
+# Another OpenRouter model
+OPENROUTER_CHAT_MODEL=anthropic/claude-sonnet-5.5 uv run adk web
+
+# Local Ollama; the server must be running and the model must support tools
+uv sync --extra adk --extra ollama
+HARNESS_CHAT_PROVIDER=ollama OLLAMA_MODEL=llama3.1:8b uv run adk web
 ```
 
-The Ollama server must be running and the selected model must support tool
-calling. The ADK integration uses the `ollama_chat` LiteLLM provider.
+The ADK integration uses LiteLLM's `openrouter` and `ollama_chat` providers.
 
 ## Decision provider modes
 
@@ -100,7 +162,7 @@ The conversational model and the typed decision provider are separate. Select
 the decision provider with `HARNESS_DECISION_PROVIDER`:
 
 ```bash
-# Default: local Ollama decision provider
+# Default: OpenRouter, OPENROUTER_DECISION_MODEL=typesafe/jev-router
 uv run adk web
 
 # Deterministic demo provider
@@ -110,24 +172,17 @@ HARNESS_DECISION_PROVIDER=demo uv run adk web
 HARNESS_DECISION_PROVIDER=ollama-system-one \
 OLLAMA_DECISION_MODEL=qwen2.5:14b uv run adk web
 
-# Hosted OpenRouter decisions; the chat model can remain local Ollama
-HARNESS_DECISION_PROVIDER=openrouter-system-one \
-OPENROUTER_API_KEY=... \
-OPENROUTER_DECISION_MODEL=deepseek/deepseek-v4-flash-0731 \
-uv run adk web
-
-# Official TypeSafe Jev decisions
-HARNESS_OFFLINE=0 HARNESS_DECISION_PROVIDER=jev \
-TYPESAFE_API_KEY=... uv run adk web
+# Official TypeSafe System One decisions
+uv sync --extra adk --extra openrouter --extra jev-sdk
+HARNESS_DECISION_PROVIDER=jev TYPESAFE_API_KEY=... uv run adk web
 ```
 
-`ollama-system-one` and `openrouter-system-one` implement the same typed
-decision contract with an OpenAI-compatible chat endpoint. They are compatible
-with the harness contract, but they are not the Jev model and their confidence
-values must be evaluated with the golden prompts before use in production.
-When `OPENROUTER_API_KEY` is absent, the app reads the `openrouter.key` entry
-from `~/.local/share/opencode/auth.json` and falls back to `opencode.key`.
-The auth file is never copied into the repository or printed.
+`openrouter-system-one` and `ollama-system-one` implement the same typed
+decision contract with an OpenAI-compatible chat endpoint. With
+`typesafe/jev-router`, Jev picks the model that answers the JSON contract;
+this is not TypeSafe's `/v1/systemone` endpoint, so the confidence values are
+self-reported and must be evaluated with the golden prompts before use in
+production. The `jev` mode calls `/v1/systemone` directly.
 
 The CLI tools `codex`, `claude` and `agy` can also be integrated as decision
 providers through their non-interactive print modes and JSON-schema output. The
@@ -155,6 +210,9 @@ check while Ollama is serving `llama3.1:8b`:
 HARNESS_OFFLINE=1 OLLAMA_MODEL=llama3.1:8b uv run python evals/run_ollama_evals.py
 ```
 
+The runner sets `HARNESS_CHAT_PROVIDER=ollama` and
+`HARNESS_DECISION_PROVIDER=ollama-system-one` unless they are already set.
+
 It fails if Ollama does not call `run_workflow`, if the tool result has the
 wrong route, or if a retrieved result has no evidence. It is intentionally
 separate from the default suite because it needs a running local model and can
@@ -174,11 +232,11 @@ never prints the API key or raw provider payloads.
 ## Test
 
 ```bash
-python3 -m unittest discover -s tests -v  # 13 tests
+python3 -m unittest discover -s tests -v  # 24 tests
 ```
 
 Optional runtime dependencies:
 
 ```bash
-uv sync --extra adk --extra ollama --extra jev-sdk
+uv sync --extra adk --extra openrouter --extra ollama --extra jev-sdk
 ```

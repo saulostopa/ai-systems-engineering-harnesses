@@ -15,6 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+# The app defaults to OpenRouter; this eval exercises the local Ollama path.
+os.environ.setdefault("HARNESS_CHAT_PROVIDER", "ollama")
+os.environ.setdefault("HARNESS_DECISION_PROVIDER", "ollama-system-one")
+
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
