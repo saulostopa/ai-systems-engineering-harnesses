@@ -1,4 +1,5 @@
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from pathlib import Path
@@ -21,6 +22,8 @@ from adk_rag_harness.jev_sdk import TypeSafeSdkDecisionProvider
 from adk_rag_harness.jev import JevDecisionProvider
 from adk_rag_harness.openai_compatible import OpenAICompatibleDecisionProvider
 from adk_rag_harness.policies import PolicyConfig, TripartitePolicy
+from adk_rag_harness.rag_adapter import RagHarnessAdapter
+from adk_rag_harness.contracts import RetrievalRequest
 from adk_rag_harness.workflow import AdkRagWorkflow, WorkflowStatus
 
 
@@ -178,6 +181,22 @@ class AdkRuntimeTests(unittest.TestCase):
         result = adapter.run_workflow('{"type": "string"}', ADK_function="find_deployment_policy")
         self.assertEqual(result["status"], "retrieved")
         self.assertEqual(result["collection"], "docs")
+
+    def test_tool_payload_exposes_tier_gate_and_guardrail(self):
+        decisions = FakeDecisions([{"needs_retrieval": (True, 0.98)}, {"collection": ("docs", 0.98), "strategy": ("hybrid", 0.98)}])
+        adapter = AdkRuntimeAdapter(AdkRagWorkflow(decisions, FakeRag()), agent_factory=lambda **kwargs: kwargs)
+        payload = adapter.run_workflow("find the deployment policy")
+        self.assertEqual(payload["status"], "retrieved")
+        self.assertIn(payload["model_tier"], {"small", "medium", "large"})
+        self.assertEqual(payload["action_gate"], "execute")
+        self.assertTrue(payload["guardrail_safe"])
+
+    def test_agent_must_call_the_workflow_for_every_message(self):
+        agent = AdkRuntimeAdapter(
+            AdkRagWorkflow(FakeDecisions([]), FakeRag()), agent_factory=lambda **kwargs: kwargs
+        ).build_agent()
+        self.assertIn("first for every user message", agent["instruction"])
+        self.assertIn("If status is direct", agent["instruction"])
 
     def test_builds_app_around_agent(self):
         calls = []
@@ -356,6 +375,60 @@ class JevFourPillarsTests(unittest.TestCase):
         self.assertEqual(reranked[0].score, 1.0)
         self.assertEqual(reranked[1].source, "source1.md")
         self.assertEqual(reranked[1].score, 0.4)
+
+
+RAG_HARNESS_ROOT = Path(__file__).parents[2] / "rag-harness"
+
+
+class RagHarnessAdapterTests(unittest.TestCase):
+    def setUp(self):
+        if str(RAG_HARNESS_ROOT) not in sys.path:
+            sys.path.insert(0, str(RAG_HARNESS_ROOT))
+        from rag_harness import retrieval
+        from rag_harness.embeddings import NGramEmbedder
+        from rag_harness.indexer import index_dir
+
+        self.retrieval = retrieval
+        self.tmp = tempfile.TemporaryDirectory()
+        repo = Path(self.tmp.name)
+        (repo / "deploy.md").write_text("Deployment policy: promote develop to main after review.\n")
+        (repo / "login.md").write_text("The login screen offers Google and Apple sign-in.\n")
+        self.embedder = NGramEmbedder()
+        index_dir(str(repo), self.embedder, str(repo / "idx"))
+        self.adapter = RagHarnessAdapter(str(RAG_HARNESS_ROOT), {"docs": str(repo / "idx")}, self.embedder)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_each_strategy_uses_its_search_function(self):
+        for strategy, function in (("keyword", "lexical_search"), ("semantic", "semantic_search"), ("hybrid", "hybrid_search")):
+            calls = []
+            original = getattr(self.retrieval, function)
+
+            def spy(*args, _original=original, **kwargs):
+                calls.append(args)
+                return _original(*args, **kwargs)
+
+            setattr(self.retrieval, function, spy)
+            try:
+                response = self.adapter.retrieve(RetrievalRequest("deployment policy", "docs", strategy))
+            finally:
+                setattr(self.retrieval, function, original)
+            self.assertEqual(len(calls), 1, strategy)
+            self.assertTrue(response.answerable, strategy)
+            self.assertIn(strategy, response.reason)
+
+    def test_keyword_search_returns_ranked_evidence_with_scores(self):
+        response = self.adapter.retrieve(RetrievalRequest("deployment policy", "docs", "keyword", top_k=1))
+        self.assertEqual(len(response.chunks), 1)
+        self.assertTrue(response.chunks[0].source.endswith("deploy.md"))
+        self.assertGreater(response.chunks[0].score, 0.0)
+
+    def test_unknown_strategy_and_collection_are_rejected(self):
+        with self.assertRaises(ValueError):
+            self.adapter.retrieve(RetrievalRequest("x", "docs", "grep"))
+        with self.assertRaises(ValueError):
+            self.adapter.retrieve(RetrievalRequest("x", "code", "hybrid"))
 
 
 if __name__ == "__main__":

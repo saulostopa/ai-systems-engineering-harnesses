@@ -62,8 +62,12 @@ request
    ```
 
 4. Start the app, open `http://localhost:8000`, select `adk_app` and ask a
-   question. The **Events** panel shows the `run_workflow` call with the
-   chosen collection and the evidence files:
+   question. The agent calls `run_workflow` for every message, so Jev, not
+   the chat model, decides whether retrieval is needed. The **Events** panel
+   shows that call with the chosen collection, strategy, `model_tier`,
+   `action_gate` and the evidence files. Reasoning models routed by
+   `typesafe/jev-router` may also show **THOUGHT** entries; they are marked as
+   thoughts and are not part of the answer:
 
    ```bash
    uv run adk web
@@ -76,8 +80,10 @@ The dependency-free Jev adapter targets TypeSafe's `/v1/systemone` contract and
 accepts an injected transport for offline tests. `TypeSafeSdkDecisionProvider`
 can use the official `typesafe-sdk` package when the optional
 `[jev-sdk]` extra is installed. Provider errors fail closed in the workflow.
-The `RagHarnessAdapter` loads the existing `rag-harness` controller by an
-allowlisted collection and returns typed evidence without controlling
+The `RagHarnessAdapter` loads the `rag-harness` index of an allowlisted
+collection and runs the strategy Jev chose: `keyword` uses lexical search,
+`semantic` uses embeddings and `hybrid` merges both with reciprocal rank
+fusion. It returns typed evidence with scores and never controls
 transitions. `AdkRuntimeAdapter` exposes this bounded workflow as a structured
 Google ADK `LlmAgent` tool and `App` when the optional `[adk]` extra is installed.
 
@@ -285,7 +291,7 @@ never prints the API key or raw provider payloads.
 ## Test
 
 ```bash
-python3 -m unittest discover -s tests -v  # 24 tests
+python3 -m unittest discover -s tests -v  # 29 tests
 ```
 
 Optional runtime dependencies:
