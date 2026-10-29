@@ -19,6 +19,59 @@ request
 ```
 
 
+## Requirements
+
+- [uv](https://docs.astral.sh/uv/) (`brew install uv`). It downloads the
+  Python 3.14 pinned in `.python-version`; no manual Python install is needed.
+- `git` and `python3` on the `PATH` for indexing with `rag-harness`.
+- An [OpenRouter](https://openrouter.ai/keys) key with credit, in
+  `OPENROUTER_API_KEY` or in the `openrouter.key` entry of
+  `~/.local/share/opencode/auth.json`. Never commit it.
+- This whole `harnesses` repository cloned: the app imports `rag-harness`
+  from the sibling folder.
+
+## Quickstart against your repository
+
+1. Install the dependencies once:
+
+   ```bash
+   cd adk-rag-harness
+   uv sync --extra adk --extra openrouter
+   ```
+
+2. Index the target repository, one index per collection. Add a `.ragignore`
+   at its root first for large generated or data files, and `.rag_index/` to
+   its `.gitignore`:
+
+   ```bash
+   RAG_EMBEDDER=openrouter PYTHONPATH=../rag-harness \
+     python3 -m rag_harness index /path/to/your-repository --profile docs
+   RAG_EMBEDDER=openrouter PYTHONPATH=../rag-harness \
+     python3 -m rag_harness index /path/to/your-repository --profile code
+   ```
+
+3. Create `adk-rag-harness/.env` (ignored by Git, no key in it). `adk web`
+   loads it automatically:
+
+   ```bash
+   HARNESS_RAG_PROVIDER=rag-harness
+   HARNESS_RAG_DOCS_INDEX=/path/to/your-repository/.rag_index/docs
+   HARNESS_RAG_CODE_INDEX=/path/to/your-repository/.rag_index/code
+   RAG_EMBEDDER=openrouter
+   OPENROUTER_EMBED_MODEL=voyageai/voyage-code-4
+   ```
+
+4. Start the app, open `http://localhost:8000`, select `adk_app` and ask a
+   question. The **Events** panel shows the `run_workflow` call with the
+   chosen collection and the evidence files:
+
+   ```bash
+   uv run adk web
+   ```
+
+Without steps 2 and 3 the app runs on demo evidence, which is enough to try
+the decision flow. The sections below detail each piece.
+
 The dependency-free Jev adapter targets TypeSafe's `/v1/systemone` contract and
 accepts an injected transport for offline tests. `TypeSafeSdkDecisionProvider`
 can use the official `typesafe-sdk` package when the optional
