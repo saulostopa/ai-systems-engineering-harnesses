@@ -21,6 +21,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Tests never write to the real usage ledger unless a test enables it.
+os.environ.setdefault("HARNESS_USAGE", "0")
 
 from hard_harness.agents import PlannerAgent, ReviewerAgent  # noqa: E402
 from hard_harness.core.schemas import NodeInput, WorkflowState, WorkflowStatus  # noqa: E402
@@ -198,6 +200,42 @@ def test_reviewer_default_e_changes_requested():
     output = agent.run(_ninput())
     assert output.review.verdict == "changes_requested"
 
+
+
+def test_openrouter_registra_custo_no_ledger_com_no_e_workflow():
+    from hard_harness import usage
+
+    if usage._usage is None:
+        return  # standalone copy without harness-usage: nothing to record
+    body = {**RESPONSE_BODY, "model": "deepseek/routed", "usage": {"prompt_tokens": 12, "completion_tokens": 7, "cost": 0.0003}}
+    original = dict(RESPONSE_BODY)
+    RESPONSE_BODY.clear()
+    RESPONSE_BODY.update(body)
+    server, base = start_fake_server()
+    with tempfile.TemporaryDirectory() as tmp:
+        saved = {k: os.environ.get(k) for k in ("HARNESS_USAGE", "HARNESS_PROJECT_ROOT", "XDG_DATA_HOME")}
+        os.environ.update({"HARNESS_USAGE": "1", "HARNESS_PROJECT_ROOT": tmp, "XDG_DATA_HOME": os.path.join(tmp, "data")})
+        try:
+            provider = OpenRouterProvider(api_key="teste-key", model="m/modelo", base_url=base)
+            with usage._usage.usage_context(operation="planner", request_id="wf-1"):
+                provider.complete("pergunta-secreta")
+        finally:
+            server.shutdown()
+            RESPONSE_BODY.clear()
+            RESPONSE_BODY.update(original)
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        ledger_dir = os.path.join(tmp, ".harness", "usage")
+        [name] = os.listdir(ledger_dir)
+        with open(os.path.join(ledger_dir, name)) as fh:
+            [line] = [json.loads(row) for row in fh]
+    assert provider.last_cost_usd == 0.0003
+    assert (line["harness"], line["component"], line["operation"], line["request_id"]) == ("hard-harness", "agent", "planner", "wf-1")
+    assert (line["routed_model"], line["input_tokens"], line["output_tokens"], line["cost_usd"]) == ("deepseek/routed", 12, 7, 0.0003)
+    assert "pergunta-secreta" not in json.dumps(line)
 
 if __name__ == "__main__":
     import traceback

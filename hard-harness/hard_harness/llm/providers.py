@@ -11,17 +11,22 @@ The hard-harness agents receive an injectable provider
         2. OLLAMA_API_URL defined      -> Ollama (short probe)
         3. otherwise                   -> Stub (with a clear warning)
 
-Cost: providers expose `last_usage` (tokens); the agents attach
-`llm_cost` to the payload; the runner applies `llm_budget`.
+Cost: providers expose `last_usage` (tokens) and `last_cost_usd`; the agents
+attach `llm_cost` and `llm_cost_usd` to the payload; the runner applies
+`llm_budget`. When the sibling `harness-usage` package is present, every call
+also writes one line to the token and cost ledger.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
+
+from ..usage import record
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
@@ -54,6 +59,35 @@ class LLMProvider:
     @property
     def last_usage(self) -> Usage:
         return Usage()
+
+    @property
+    def last_cost_usd(self) -> float | None:
+        return getattr(self, "_cost_usd", None)
+
+    def _post(self, url: str, payload: dict[str, Any], headers: dict[str, str], timeout_s: float) -> dict[str, Any]:
+        """POST and write one ledger line, also when the call fails."""
+
+        started = time.monotonic()
+        try:
+            data = _http_post_json(url, payload, headers, timeout_s)
+        except LLMError as exc:
+            record(component="agent", provider=self.name, model=payload.get("model", ""),
+                   latency_ms=round((time.monotonic() - started) * 1000), status="error",
+                   error_kind=str(exc).split(":", 1)[0])
+            raise
+        usage = data.get("usage") or {}
+        self._cost_usd = usage.get("cost") if self.name == "openrouter" else 0.0
+        record(
+            component="agent",
+            provider=self.name,
+            model=payload.get("model", ""),
+            routed_model=data.get("model"),
+            input_tokens=int(usage.get("prompt_tokens", 0) or 0),
+            output_tokens=int(usage.get("completion_tokens", 0) or 0),
+            cost_usd=self._cost_usd if self.name == "openrouter" else None,
+            latency_ms=round((time.monotonic() - started) * 1000),
+        )
+        return data
 
 
 def _http_post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout_s: float) -> dict[str, Any]:
@@ -99,7 +133,7 @@ class OpenRouterProvider(LLMProvider):
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        data = _http_post_json(
+        data = self._post(
             f"{self.base_url}/chat/completions",
             {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, "temperature": self.temperature},
             {"Authorization": f"Bearer {self.api_key}"},
@@ -136,7 +170,7 @@ class OllamaProvider(LLMProvider):
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
-        data = _http_post_json(
+        data = self._post(
             f"{self.base_url}/v1/chat/completions",
             {"model": self.model, "messages": messages, "max_tokens": self.max_tokens, "stream": False},
             {},

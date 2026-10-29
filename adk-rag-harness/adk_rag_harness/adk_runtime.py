@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .usage import start_request
 from .workflow import AdkRagWorkflow, WorkflowResult
 
 
@@ -74,7 +75,15 @@ class AdkRuntimeAdapter:
                 "confirm or human_review, say the answer needs human confirmation."
             ),
             tools=[self.run_workflow],
+            before_agent_callback=self._start_request,
         )
+
+    @staticmethod
+    def _start_request(callback_context: Any) -> None:
+        """Every ledger line of one user message shares the ADK invocation id."""
+
+        start_request(getattr(callback_context, "invocation_id", None))
+        return None
 
     def build_app(self) -> Any:
         """Wrap the agent in the ADK ``App`` container used by ADK runtimes."""

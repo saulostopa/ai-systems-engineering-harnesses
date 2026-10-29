@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from .contracts import (
@@ -12,6 +13,7 @@ from .contracts import (
     DecisionQuestion,
     DecisionResult,
 )
+from .usage import record_decision
 
 
 class TypeSafeSdkDecisionProvider(DecisionProvider):
@@ -24,6 +26,7 @@ class TypeSafeSdkDecisionProvider(DecisionProvider):
         self._sdk = sdk
 
     def decide(self, state: dict[str, Any], questions: list[DecisionQuestion]) -> DecisionResult:
+        started = time.monotonic()
         try:
             client = self._client or self._new_client()
             response = client.system_one(
@@ -31,10 +34,31 @@ class TypeSafeSdkDecisionProvider(DecisionProvider):
                 questions={question.name: self._to_sdk_question(question) for question in questions},
                 model=self.model,
             )
+        except Exception as exc:
+            record_decision(provider="typesafe", model=self.model, questions=questions, started=started, error=exc)
+            if isinstance(exc, DecisionProviderError):
+                raise
+            raise DecisionProviderError(f"TypeSafe SDK request failed: {exc}") from exc
+        usage = self._to_mapping(getattr(response, "usage", None))
+        routed_model = str(getattr(response, "model", "")) or None
+        try:
             answers = {
                 question.name: self._from_sdk_answer(question, response.answers[question.name])
                 for question in questions
             }
+        except Exception as exc:
+            record_decision(
+                provider="typesafe", model=self.model, questions=questions, started=started,
+                usage=usage, routed_model=routed_model, error=exc, invalid=True,
+            )
+            if isinstance(exc, DecisionProviderError):
+                raise
+            raise DecisionProviderError(f"TypeSafe SDK request failed: {exc}") from exc
+        record_decision(
+            provider="typesafe", model=self.model, questions=questions, started=started,
+            usage=usage, routed_model=routed_model,
+        )
+        try:
             return DecisionResult(
                 answers,
                 provider="typesafe-sdk",

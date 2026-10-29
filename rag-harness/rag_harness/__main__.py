@@ -21,6 +21,7 @@ from .embeddings import make_embedder
 from .eval import load_queries
 from .indexer import PROFILES, index_dir, index_path_for, load_index
 from .retrieval import hybrid_search, lexical_search
+from .usage import usage_context
 
 
 def main() -> None:
@@ -57,6 +58,12 @@ def main() -> None:
     args = ap.parse_args()
     embedder = make_embedder()
     print(f"embedder: {type(embedder).__name__}")
+    # Ledger lines (when harness-usage is present) belong to the target repository.
+    with usage_context(project_root=os.path.abspath(args.root)):
+        _run(args, embedder)
+
+
+def _run(args, embedder) -> None:
 
     if args.cmd == "eval":
         from .eval import run_eval

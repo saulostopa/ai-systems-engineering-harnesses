@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from .chunker import Chunk, chunk_file
 from .embeddings import cosine, embedder_id
+from .usage import usage_context
 
 DEFAULT_EXTS = (".py", ".md", ".txt", ".sh", ".yaml", ".yml", ".json", ".ts", ".tsx", ".js", ".mjs")
 PROFILES: dict[str, tuple[str, ...]] = {
@@ -213,7 +214,9 @@ def index_dir(
                 pending[c.hash] = c.text
 
     hashes = list(pending)
-    for chunk_hash, vector in zip(hashes, _embed_missing(embedder, [pending[k] for k in hashes])):
+    with usage_context(component="embedding_index", operation=f"index {profile}", project_root=os.path.abspath(root)):
+        vectors = _embed_missing(embedder, [pending[k] for k in hashes])
+    for chunk_hash, vector in zip(hashes, vectors):
         new_vectors[chunk_hash] = vector
 
     with open(hashes_path, "w", encoding="utf-8") as fh:

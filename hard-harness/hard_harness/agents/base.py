@@ -35,7 +35,11 @@ class BaseAgent:
         """Attaches the provider cost (usage) to the payload — the runner decides the budget."""
         usage = getattr(self.provider, "last_usage", None)
         tokens = usage.total if usage else 0
-        return {"llm_cost": float(tokens) / 1000.0 if tokens else 1.0, "llm_tokens": tokens}
+        return {
+            "llm_cost": float(tokens) / 1000.0 if tokens else 1.0,
+            "llm_tokens": tokens,
+            "llm_cost_usd": getattr(self.provider, "last_cost_usd", None),
+        }
 
     def run(self, ninput: NodeInput) -> NodeOutput:
         raise NotImplementedError

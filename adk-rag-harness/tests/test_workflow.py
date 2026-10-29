@@ -1,3 +1,6 @@
+import contextvars
+import json
+import os
 import sys
 import tempfile
 import unittest
@@ -6,6 +9,8 @@ from types import SimpleNamespace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
+# Tests never write to the real usage ledger unless a test enables it.
+os.environ.setdefault("HARNESS_USAGE", "0")
 
 from adk_rag_harness.contracts import (
     ActionGate,
@@ -15,6 +20,7 @@ from adk_rag_harness.contracts import (
     DecisionResult,
     EvidenceChunk,
     ModelTier,
+    QuestionType,
     RetrievalResponse,
     ToolActionDecision,
 )
@@ -432,6 +438,96 @@ class RagHarnessAdapterTests(unittest.TestCase):
             self.adapter.retrieve(RetrievalRequest("x", "docs", "grep"))
         with self.assertRaises(ValueError):
             self.adapter.retrieve(RetrievalRequest("x", "code", "hybrid"))
+
+
+
+class UsageLedgerTests(unittest.TestCase):
+    def setUp(self):
+        from adk_rag_harness import usage
+
+        if usage._usage is None:
+            self.skipTest("harness-usage is not available")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name) / "repo"
+        self.repo.mkdir()
+        patcher = mock.patch.dict(os.environ, {
+            "HARNESS_USAGE": "1",
+            "HARNESS_PROJECT_ROOT": str(self.repo),
+            "XDG_DATA_HOME": str(Path(self.tmp.name) / "data"),
+            "HARNESS_USAGE_OFFLINE": "1",
+        })
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def lines(self):
+        directory = self.repo / ".harness" / "usage"
+        return [json.loads(line) for path in directory.glob("*.jsonl") for line in path.read_text().splitlines()]
+
+    def test_openrouter_decision_records_tokens_cost_and_routed_model(self):
+        def transport(payload):
+            return {
+                "model": "moonshotai/kimi-k2",
+                "choices": [{"message": {"content": json.dumps({"answers": {"needs_retrieval": {"type": "noul", "noul": 0.9}}})}}],
+                "usage": {"prompt_tokens": 120, "completion_tokens": 9, "cost": 0.00021},
+            }
+
+        provider = OpenAICompatibleDecisionProvider(
+            base_url="https://openrouter.ai/api/v1", model="typesafe/jev-router", transport=transport
+        )
+        provider.decide({"request": "segredo-do-usuario"}, [DecisionQuestion("needs_retrieval", "?", QuestionType.NOUL)])
+        [line] = self.lines()
+        self.assertEqual(line["component"], "decision")
+        self.assertEqual(line["operation"], "needs_retrieval")
+        self.assertEqual((line["provider"], line["routed_model"]), ("openrouter", "moonshotai/kimi-k2"))
+        self.assertEqual((line["input_tokens"], line["output_tokens"], line["cost_usd"]), (120, 9, 0.00021))
+        self.assertNotIn("segredo-do-usuario", json.dumps(line))
+
+    def test_failed_decision_records_an_error_line(self):
+        from urllib.error import HTTPError
+
+        def transport(payload):
+            raise DecisionProviderError("compatible model request failed") from HTTPError("u", 402, "Payment Required", {}, None)
+
+        provider = OpenAICompatibleDecisionProvider(
+            base_url="https://openrouter.ai/api/v1", model="typesafe/jev-router", transport=transport
+        )
+        with self.assertRaises(DecisionProviderError):
+            provider.decide({"request": "x"}, [DecisionQuestion("needs_retrieval", "?", QuestionType.NOUL)])
+        [line] = self.lines()
+        self.assertEqual((line["status"], line["error_kind"], line["cost_usd"]), ("error", "HTTP 402", None))
+
+    def test_unusable_answer_is_billed_and_recorded_as_invalid(self):
+        def transport(payload):
+            return {"model": "anthropic/opus", "choices": [{"message": {"content": "not json"}}],
+                    "usage": {"prompt_tokens": 238, "completion_tokens": 77, "cost": 0.0025}}
+
+        provider = OpenAICompatibleDecisionProvider(
+            base_url="https://openrouter.ai/api/v1", model="typesafe/jev-router", transport=transport
+        )
+        with self.assertRaises(DecisionProviderError):
+            provider.decide({"request": "x"}, [DecisionQuestion("needs_retrieval", "?", QuestionType.NOUL)])
+        [line] = self.lines()
+        self.assertEqual((line["status"], line["error_kind"]), ("error", "invalid_response"))
+        self.assertEqual((line["routed_model"], line["cost_usd"]), ("anthropic/opus", 0.0025))
+
+    def test_agent_callback_groups_calls_under_the_invocation_id(self):
+        def transport(payload):
+            return {
+                "choices": [{"message": {"content": json.dumps({"answers": {"needs_retrieval": {"type": "noul", "noul": 0.1}}})}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0},
+            }
+
+        provider = OpenAICompatibleDecisionProvider(base_url="http://localhost:11434/v1", model="qwen2.5:14b", transport=transport)
+        agent = AdkRuntimeAdapter(AdkRagWorkflow(provider, FakeRag()), agent_factory=lambda **kwargs: kwargs).build_agent()
+
+        def one_message():
+            agent["before_agent_callback"](SimpleNamespace(invocation_id="e-123"))
+            agent["tools"][0]("hello")
+
+        contextvars.copy_context().run(one_message)
+        [line] = self.lines()
+        self.assertEqual((line["request_id"], line["provider"], line["cost_source"]), ("e-123", "ollama", "provider"))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .contracts import DecisionAnswer, DecisionProviderError, DecisionQuestion, DecisionResult, QuestionType
+from .usage import record_decision
 
 
 JsonTransport = Callable[[dict[str, Any]], dict[str, Any]]
@@ -51,11 +53,13 @@ class OpenAICompatibleDecisionProvider:
         api_key: str = "",
         timeout_s: float = 30.0,
         transport: JsonTransport | None = None,
+        provider: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self.timeout_s = timeout_s
+        self.provider = provider or ("openrouter" if "openrouter.ai" in self.base_url else "ollama" if "11434" in self.base_url else "openai-compatible")
         self.transport = transport or self._http_transport
 
     def decide(self, state: dict[str, Any], questions: list[DecisionQuestion]) -> DecisionResult:
@@ -73,21 +77,39 @@ class OpenAICompatibleDecisionProvider:
             "temperature": 0,
             "response_format": {"type": "json_object"},
         }
+        started = time.monotonic()
         try:
             response = self.transport(payload)
+        except Exception as exc:
+            record_decision(provider=self.provider, model=self.model, questions=questions, started=started, error=exc)
+            if isinstance(exc, DecisionProviderError):
+                raise
+            raise DecisionProviderError(f"compatible model request failed: {exc}") from exc
+        usage = response.get("usage") if isinstance(response, dict) else None
+        routed_model = response.get("model") if isinstance(response, dict) else None
+        try:
             content = response["choices"][0]["message"]["content"]
             parsed = json.loads(content) if isinstance(content, str) else content
             answers = parsed.get("answers") if isinstance(parsed, dict) else None
             if not isinstance(answers, dict):
                 raise DecisionProviderError("compatible model response is missing an answers object")
             normalized = {question.name: self._normalize(question, answers.get(question.name)) for question in questions}
-            return DecisionResult(normalized, provider="openai-compatible", model=self.model)
-        except DecisionProviderError:
-            raise
-        except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise DecisionProviderError(f"compatible model returned an invalid decision response: {exc}") from exc
         except Exception as exc:
+            # The call was billed even though its answer is unusable.
+            record_decision(
+                provider=self.provider, model=self.model, questions=questions, started=started,
+                usage=usage, routed_model=routed_model, error=exc, invalid=True,
+            )
+            if isinstance(exc, DecisionProviderError):
+                raise
+            if isinstance(exc, (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError)):
+                raise DecisionProviderError(f"compatible model returned an invalid decision response: {exc}") from exc
             raise DecisionProviderError(f"compatible model request failed: {exc}") from exc
+        record_decision(
+            provider=self.provider, model=self.model, questions=questions, started=started,
+            usage=usage, routed_model=routed_model,
+        )
+        return DecisionResult(normalized, provider="openai-compatible", model=self.model)
 
     def _http_transport(self, payload: dict[str, Any]) -> dict[str, Any]:
         request = Request(

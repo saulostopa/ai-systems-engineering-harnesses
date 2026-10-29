@@ -5,10 +5,14 @@ Run with:  pytest tests/ -q   (or)   python tests/test_rag.py
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 import tempfile
+
+# Tests never write to the real usage ledger unless a test enables it.
+os.environ.setdefault("HARNESS_USAGE", "0")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -211,6 +215,43 @@ def test_openrouter_embedder_envia_em_lotes_e_respeita_index():
     assert calls[0]["model"] == "voyageai/voyage-code-4"
     assert embedder_id(emb) == "openrouter:voyageai/voyage-code-4"
 
+
+
+def test_openrouter_embedder_registra_custo_da_indexacao_no_ledger():
+    from rag_harness import usage
+
+    if usage._usage is None:
+        return  # standalone copy without harness-usage: nothing to record
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = os.path.join(tmp, "repo")
+        os.makedirs(repo)
+        with open(os.path.join(repo, "a.md"), "w") as fh:
+            fh.write("# Deploy\npromote develop to main\n")
+
+        def transport(payload):
+            data = [{"index": i, "embedding": [1.0, 0.0]} for i, _ in enumerate(payload["input"])]
+            return {"data": data, "model": "voyage-code-4", "usage": {"prompt_tokens": 7, "cost": 8.4e-07}}
+
+        emb = OpenRouterEmbedder(api_key="test", transport=transport)
+        old = {k: os.environ.get(k) for k in ("HARNESS_USAGE", "XDG_DATA_HOME")}
+        os.environ.update({"HARNESS_USAGE": "1", "XDG_DATA_HOME": os.path.join(tmp, "data")})
+        try:
+            index_dir(repo, emb, os.path.join(repo, ".rag_index"), profile="docs")
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        ledger_dir = os.path.join(repo, ".harness", "usage")
+        [name] = os.listdir(ledger_dir)
+        with open(os.path.join(ledger_dir, name)) as fh:
+            [line] = [json.loads(row) for row in fh]
+        assert line["component"] == "embedding_index"
+        assert line["operation"] == "index docs"
+        assert line["harness"] == "rag-harness"
+        assert line["project"] == "repo"
+        assert (line["input_tokens"], line["cost_usd"], line["cost_source"]) == (7, 8.4e-07, "provider")
 
 if __name__ == "__main__":
     import traceback

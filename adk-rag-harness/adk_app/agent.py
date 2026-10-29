@@ -22,6 +22,7 @@ from adk_rag_harness.contracts import DecisionAnswer, DecisionQuestion, Decision
 from adk_rag_harness.jev_sdk import TypeSafeSdkDecisionProvider
 from adk_rag_harness.openai_compatible import OpenAICompatibleDecisionProvider, load_openrouter_api_key
 from adk_rag_harness.rag_adapter import RagHarnessAdapter
+from adk_rag_harness.usage import litellm_logger
 from adk_rag_harness.workflow import DEFAULT_COLLECTIONS, AdkRagWorkflow
 
 
@@ -128,6 +129,12 @@ def _build_workflow() -> AdkRagWorkflow:
     elif RAG_PROVIDER == "rag-harness":
         repository_root = Path(__file__).parents[2]
         indexes = _rag_collection_indexes(repository_root)
+        # Ledger lines belong to the repository the indexes were built from.
+        for path in indexes.values():
+            if ".rag_index" in Path(path).parts:
+                index_root = Path(path).parts.index(".rag_index")
+                os.environ.setdefault("HARNESS_PROJECT_ROOT", str(Path(*Path(path).parts[:index_root])))
+                break
         rag = RagHarnessAdapter(str(repository_root / "rag-harness"), indexes)
         collections = tuple(indexes)
     else:
@@ -160,6 +167,17 @@ def _require_openrouter_key() -> str:
     return openrouter_key
 
 
+def _install_usage_logger() -> None:
+    """Record conversation-model tokens and cost; idempotent across adk web reloads."""
+
+    import litellm
+
+    model = OPENROUTER_CHAT_MODEL if CHAT_PROVIDER == "openrouter" else OLLAMA_MODEL
+    logger = litellm_logger(CHAT_PROVIDER, model)
+    callbacks = [cb for cb in litellm.callbacks if type(cb).__name__ != "LedgerLogger"]
+    litellm.callbacks = callbacks + ([logger] if logger is not None else [])
+
+
 def _build_model():
     try:
         from google.adk.models.lite_llm import LiteLlm
@@ -168,6 +186,7 @@ def _build_model():
             "LiteLLM support requires the optional dependency: "
             "uv sync --extra adk --extra ollama"
         ) from exc
+    _install_usage_logger()
     if CHAT_PROVIDER == "openrouter":
         return LiteLlm(
             model=f"openrouter/{OPENROUTER_CHAT_MODEL}",

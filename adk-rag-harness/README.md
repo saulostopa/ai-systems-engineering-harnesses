@@ -251,6 +251,22 @@ workflow as unrestricted agents because they can carry workspace tools, session
 state and side effects. The current app leaves those modes opt-in for a later
 adapter; use Ollama or OpenRouter for the supported provider modes today.
 
+## Token and cost ledger
+
+When the sibling `harness-usage` package is present, every Jev decision,
+TypeSafe call, conversation-model call (through a LiteLLM logger) and query
+embedding writes one line to `<target repository>/.harness/usage/`. The
+target is the repository that holds the configured `.rag_index`, or
+`HARNESS_PROJECT_ROOT`. Calls of one message share the ADK invocation id, so
+the report shows the cost per question. Decisions whose answer cannot be used
+are still billed and are recorded as `invalid_response`.
+
+```bash
+cd ../harness-usage && python3 -m harness_usage report   # see harness-usage/README.md
+```
+
+`HARNESS_BUDGET_USD` (default 25) warns when the month passes 80% and 100%.
+
 ## Golden prompt evaluations
 
 The natural-language examples from the course are also stored as executable
@@ -291,7 +307,7 @@ never prints the API key or raw provider payloads.
 ## Test
 
 ```bash
-python3 -m unittest discover -s tests -v  # 29 tests
+python3 -m unittest discover -s tests -v  # 33 tests
 ```
 
 Optional runtime dependencies:

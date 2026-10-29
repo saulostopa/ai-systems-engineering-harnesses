@@ -12,11 +12,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from .usage import record
 
 DIM = 256
 OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434")
@@ -146,12 +149,33 @@ class OpenRouterEmbedder:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self.batch_size):
             batch = texts[start:start + self.batch_size]
-            response = self.transport({"model": self.model, "input": batch})
+            started = time.monotonic()
+            try:
+                response = self.transport({"model": self.model, "input": batch})
+            except Exception as exc:
+                self._record(started, {}, status="error", error_kind=type(exc).__name__)
+                raise
+            self._record(started, response)
             data = sorted(response.get("data") or [], key=lambda item: item.get("index", 0))
             if len(data) != len(batch):
                 raise RuntimeError(f"OpenRouter returned {len(data)} embeddings for {len(batch)} inputs")
             vectors.extend(item["embedding"] for item in data)
         return vectors
+
+    def _record(self, started: float, response: dict[str, Any], **status: Any) -> None:
+        """One ledger line per billed request; the component comes from the caller's context."""
+
+        usage = response.get("usage") or {}
+        record(
+            component="embedding_query",
+            provider="openrouter",
+            model=self.model,
+            routed_model=response.get("model"),
+            input_tokens=usage.get("prompt_tokens", 0),
+            cost_usd=usage.get("cost"),
+            latency_ms=round((time.monotonic() - started) * 1000),
+            **status,
+        )
 
     def _http_transport(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.api_key:

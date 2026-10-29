@@ -19,6 +19,8 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Tests never write to the real usage ledger unless a test enables it.
+os.environ.setdefault("HARNESS_USAGE", "0")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 
 from hard_harness.core import Limits, Node, NodeInput, NodeKind, NodeOutput, Runner, WorkflowGraph  # noqa: E402
@@ -407,6 +409,25 @@ def test_exemplo_completo_fecha_com_evidencia():
         assert state.data["evidence"]["passed"] is True
         assert len(result["store"].list_events()) >= 15  # full trail
 
+
+
+def test_contexto_do_ledger_chega_ao_no_com_timeout():
+    from hard_harness import usage
+
+    if usage._usage is None:
+        return  # standalone copy without harness-usage
+    seen: dict = {}
+
+    def fn(ninput: NodeInput) -> NodeOutput:
+        seen.update(usage._usage.current_context())
+        return NodeOutput(node_id="a", ok=True, payload={})
+
+    g = WorkflowGraph(name="ctx")
+    g.add_node(Node("a", DET, fn, timeout_s=5))
+    g.set_start("a")
+    state = run(g)
+    assert seen["operation"] == "a"
+    assert seen["request_id"] == state.workflow_id
 
 if __name__ == "__main__":
     import traceback
