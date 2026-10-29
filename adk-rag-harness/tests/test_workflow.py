@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -220,8 +221,10 @@ class AdkRuntimeTests(unittest.TestCase):
 
     def test_missing_adk_is_explicit(self):
         adapter = AdkRuntimeAdapter(AdkRagWorkflow(FakeDecisions([]), FakeRag()))
-        with self.assertRaises(AdkRuntimeUnavailable):
-            adapter.build_agent()
+        # A None entry makes the import fail even where google-adk is installed.
+        with mock.patch.dict(sys.modules, {"google.adk.agents": None}):
+            with self.assertRaises(AdkRuntimeUnavailable):
+                adapter.build_agent()
 
 
 class OpenAICompatibleTests(unittest.TestCase):
