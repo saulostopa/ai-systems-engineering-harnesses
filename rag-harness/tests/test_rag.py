@@ -6,14 +6,15 @@ Run with:  pytest tests/ -q   (or)   python tests/test_rag.py
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from rag_harness.chunker import Chunk, chunk_file
-from rag_harness.embeddings import NGramEmbedder, cosine
-from rag_harness.indexer import index_dir
+from rag_harness.embeddings import NGramEmbedder, OpenRouterEmbedder, cosine, embedder_id
+from rag_harness.indexer import discover_files, index_dir, index_path_for, is_ignored, load_index, semantic_search
 from rag_harness.retrieval import hybrid_search, lexical_search, rrf_merge
 
 FIXTURE = """\
@@ -117,6 +118,98 @@ def test_lexical_boost_por_nome_de_arquivo():
         index = index_dir(tmp, emb)
         top = lexical_search(index, "instalador que ativa hooksPath", top_k=1)
         assert top and "install.sh" in top[0][0].path, f"expected install.sh, got {top[:1]}"
+
+
+def _write(root: str, rel: str, text: str = "conteudo\n") -> None:
+    path = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def _rel(root: str, files: list[str]) -> list[str]:
+    return sorted(os.path.relpath(f, root).replace(os.sep, "/") for f in files)
+
+
+def test_discover_respeita_gitignore_lockfiles_e_ragignore():
+    with tempfile.TemporaryDirectory() as tmp:
+        subprocess.run(["git", "init", "-q", tmp], check=True)
+        _write(tmp, ".gitignore", "ios/\n")
+        _write(tmp, ".ragignore", "# dump de dados\ndatabase/exercises.ts\n")
+        _write(tmp, "src/App.tsx", "export const App = () => null\n")
+        _write(tmp, "src/util.mjs")
+        _write(tmp, "docs/guia.md")
+        _write(tmp, "ios/Pods/Manifest.json")
+        _write(tmp, "package-lock.json", "{}\n")
+        _write(tmp, "database/exercises.ts")
+        _write(tmp, ".github/workflows/ci.yml")
+        assert _rel(tmp, discover_files(tmp)) == ["docs/guia.md", "src/App.tsx", "src/util.mjs"]
+
+
+def test_discover_sem_git_aplica_lockfiles_e_ragignore():
+    with tempfile.TemporaryDirectory() as tmp:
+        _write(tmp, ".ragignore", "generated/\n*.min.js\n")
+        _write(tmp, "app.ts")
+        _write(tmp, "vendor.min.js")
+        _write(tmp, "generated/schema.json")
+        _write(tmp, "yarn.lock")
+        _write(tmp, "pnpm-lock.yaml")
+        _write(tmp, "node_modules/pkg/index.js")
+        assert _rel(tmp, discover_files(tmp)) == ["app.ts"]
+
+
+def test_is_ignored_padroes():
+    assert is_ignored("database/exercises.ts", ["database/exercises.ts"])
+    assert is_ignored("a/build/x.ts", ["build/"])
+    assert not is_ignored("a/build.ts", ["build/"])
+    assert is_ignored("src/x.min.js", ["*.min.js"])
+    assert is_ignored("ios/Pods/a.json", ["/ios"])
+    assert not is_ignored("src/ios/a.json", ["/ios"])
+
+
+def test_perfis_docs_e_code_geram_indices_separados():
+    with tempfile.TemporaryDirectory() as tmp:
+        _write(tmp, "README.md", "politica de deploy\n")
+        _write(tmp, "src/login.ts", "export function login() { return true }\n")
+        emb = NGramEmbedder()
+        docs = index_dir(tmp, emb, profile="docs")
+        code = index_dir(tmp, emb, profile="code")
+        assert {os.path.basename(c.path) for c in docs.chunks} == {"README.md"}
+        assert {os.path.basename(c.path) for c in code.chunks} == {"login.ts"}
+        assert os.path.exists(os.path.join(index_path_for(tmp, "docs"), "chunks.json"))
+        assert os.path.exists(os.path.join(index_path_for(tmp, "code"), "chunks.json"))
+        assert load_index(index_path_for(tmp, "code")).embedder == "ngram:256"
+
+
+def test_troca_de_embedder_reindexa_tudo_e_busca_falha_fechado():
+    with tempfile.TemporaryDirectory() as tmp:
+        _write(tmp, "a.py", FIXTURE)
+        index_dir(tmp, NGramEmbedder(dim=256))
+        index = index_dir(tmp, NGramEmbedder(dim=64))
+        assert index.embedder == "ngram:64"
+        assert all(len(v) == 64 for v in index.vectors.values())
+        try:
+            semantic_search(load_index(index_path_for(tmp)), NGramEmbedder(dim=256), "fipe")
+        except ValueError as exc:
+            assert "ngram:64" in str(exc)
+        else:
+            raise AssertionError("mismatched embedder must fail closed")
+
+
+def test_openrouter_embedder_envia_em_lotes_e_respeita_index():
+    calls = []
+
+    def transport(payload):
+        calls.append(payload)
+        data = [{"index": i, "embedding": [float(len(text))]} for i, text in enumerate(payload["input"])]
+        return {"data": list(reversed(data))}
+
+    emb = OpenRouterEmbedder(model="openrouter/voyageai/voyage-code-4", api_key="test", batch_size=2, transport=transport)
+    vectors = emb.embed_batch(["a", "bb", "ccc", "dddd", "eeeee"])
+    assert vectors == [[1.0], [2.0], [3.0], [4.0], [5.0]]
+    assert [len(c["input"]) for c in calls] == [2, 2, 1]
+    assert calls[0]["model"] == "voyageai/voyage-code-4"
+    assert embedder_id(emb) == "openrouter:voyageai/voyage-code-4"
 
 
 if __name__ == "__main__":
