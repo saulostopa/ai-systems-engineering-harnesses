@@ -1,15 +1,15 @@
 # Basic harness package — templates
 
-Copy this package to the root of a small project to deliver the minimal
-harness in minutes. Modeled after the `webmotors-harness-factory`.
+These files are the payload installed at the root of a small project. Use the
+package installer instead of copying `templates/` manually so scripts, hooks
+and execution-plan directories are installed consistently.
 
 ## Installation
 
-```sh
-cp -r templates/ <your-project>/
-cd <your-project>
-./init.sh          # validates the environment and prints the next steps
-chmod +x init.sh   # if the execution bit was lost in the copy
+```bash
+./harness-basic/install.sh /absolute/path/to/project
+cd /absolute/path/to/project
+./init.sh
 ```
 
 ## Contents
@@ -31,11 +31,13 @@ chmod +x init.sh   # if the execution bit was lost in the copy
 1. Edit sections 1 and 7 of `AGENTS.md` (what the repo is, real commands).
 2. Replace the example features in `feature_list.json` with yours.
 3. If the project does not use Node, adjust section 4 of `init.sh`.
-4. (Optional) Install the skills package: `harness-agent-skills` (see the Library).
+4. Optionally add the course standard skill profile under `.agents/skills/`;
+   the standalone core package does not bundle it.
 
 ## Natural evolution
 
-- Need mechanical gates? Add pre-commit/pre-push hooks (course Project 02).
+- Mechanical pre-commit/pre-push gates are installed by `install.sh` when the
+  target is already a Git repository.
 - Need flow management? Add a workflow engine on top of this package — see the enterprise harness design for the contract it must satisfy.
 - Need area context? Evolve to the Area Copilot (Project 05).
 

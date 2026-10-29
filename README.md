@@ -8,15 +8,16 @@ Each directory is independently usable. Start with `harness-basic` for a small p
 
 | Project | Use it for | Start here |
 |---|---|---|
-| `harness-basic` | Installable policies, templates, hooks, and gates | `./harness-basic/install.sh <project>` |
+| `harness-basic` | Installable core: router, state, policies, plans, hooks and gates | `harness-basic/README.md` |
 | `app-harness` | E2E and agentic navigation checks | `app-harness/README.md` |
 | `domains` | Finance, games, and commercial domain packs | Domain-specific pack |
 | `rag-harness` | Local hybrid RAG with JSON index and Ollama embeddings | `rag-harness/rag_harness/__main__.py` |
 | `area-copilot` | Business context with cited sources | `area-copilot/area_harness/__main__.py` |
 | `hard-harness` | Executable graphs, gates, and evidence | `hard-harness/README.md` |
 | `enterprise-harness` | Multi-repository orchestration | `enterprise-harness/README.md` |
-| `adk-rag-harness` | ADK + RAG + Jev with local or OpenRouter decisions | `adk-rag-harness/README.md` |
+| `adk-rag-harness` | ADK + RAG + Jev with 4-pillar operational decisions | `adk-rag-harness/README.md` |
 | `adk-rag-postgres-harness` | Shared PostgreSQL + pgvector RAG | `adk-rag-postgres-harness/README.md` |
+
 | `artifacts-intranet` | Searchable shared artifact context | `artifacts-intranet/README.md` |
 
 ## Quick starts
@@ -26,6 +27,12 @@ Each directory is independently usable. Start with `harness-basic` for a small p
 ```bash
 ./harness-basic/install.sh /path/to/your-project
 ```
+
+The standalone directory installs the core contract. Course-derived
+distributions can additionally bundle the seven-skill standard profile under
+`.agents/skills/` and expose an explicit `./install.sh --self` mode when the
+package directory is also the repository being managed. See
+`harness-basic/README.md` for the boundary between both profiles.
 
 ### Local RAG
 
@@ -69,8 +76,9 @@ See the project README before ingesting a collection.
 
 - Use `harness-basic` when the project needs a small, installable control layer.
 - Use `rag-harness` when one developer or a small project can keep the index locally.
-- Use `adk-rag-harness` when typed routing, Jev, and ADK traces are useful.
+- Use `adk-rag-harness` when typed routing, 4-pillar Jev decisions (model routing, guardrails, reranking, tripartite gating), and ADK traces are useful.
 - Use `adk-rag-postgres-harness` when multiple people or services share the index.
+
 - Use `enterprise-harness` when one orchestrator manages several repositories.
 - Use `hard-harness` when executable graph control and deterministic gates are the main goal.
 
