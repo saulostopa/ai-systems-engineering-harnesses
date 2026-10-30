@@ -7,6 +7,14 @@ The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases
 to 5 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
 chunks, symbols, imports, memory, the MCP server and the ADK wiring.
 
+## Quick View: How it Works
+
+**[Open the interactive flow](https://claude.ai/artifact/GRLxiHpRE9oML4ngJAyvnb)**, or [its file in this repository](../flowcharts/2026-10-30-code-memory-postgres-jev/code-memory-postgres-jev.html).
+It shows, in Portuguese, how one question travels with Jev in `adk web` and without
+it through MCP or the CLI.
+
+[![The code memory flow](../flowcharts/2026-10-30-code-memory-postgres-jev/code-memory-postgres-jev.visual-check.1440x900.light.png)](https://claude.ai/artifact/GRLxiHpRE9oML4ngJAyvnb)
+
 ## Start
 
 ```bash

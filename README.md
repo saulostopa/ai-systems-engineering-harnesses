@@ -4,6 +4,11 @@ Standalone harness projects for reliable AI-assisted development. This repositor
 
 Each directory is independently usable. Start with `harness-basic` for a small project, use `app-harness` or `domains` for extensions, and choose one of the RAG projects when the agent needs repository or business context.
 
+## Quick View: How it Works
+
+**[Open the code memory flow](https://claude.ai/artifact/GRLxiHpRE9oML4ngJAyvnb)** ([file](flowcharts/2026-10-30-code-memory-postgres-jev/code-memory-postgres-jev.html)): how one
+question travels with Jev and without it, in Portuguese.
+
 ## Catalog
 
 | Project | Use it for | Start here |
