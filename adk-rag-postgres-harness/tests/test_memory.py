@@ -53,9 +53,38 @@ class CredentialTests(unittest.TestCase):
             "private key": "-----BEGIN RSA PRIVATE KEY-----",
             "URL with a password": "postgresql://user:hunter2@db.example.com/app",
             "secret assignment": "password = correcthorse",
+            "Stripe key": "sk_live_abcd1234efgh5678",
+            "GitLab token": "glpat-abcd1234efgh5678",
+            "npm token": "npm_abcd1234efgh5678abcd",
+            "bearer token": "Authorization: Bearer abcd1234efgh5678",
+            "secret in a sentence": "the password is abcd1234efgh",
         }
         for kind, text in samples.items():
             self.assertEqual(find_credential(text), kind, text)
+
+    def test_names_with_a_prefix_or_suffix_are_found(self):
+        for text in (
+            "DB_PASSWORD=abcd1234efgh",
+            "SECRET_KEY=abcd1234efgh",
+            "client_secret=abcd1234efgh",
+            "API_TOKEN=abcd1234efgh",
+            "AWS_SECRET_ACCESS_KEY=abcd1234efgh",
+            "dbPassword: abcd1234efgh",
+            "senha: abcd1234efgh",
+        ):
+            self.assertEqual(find_credential(text), "secret assignment", text)
+
+    def test_references_to_a_secret_pass(self):
+        for text in (
+            "api_key=process.env.API_KEY must be used",
+            "token = getAccessToken() is called on start",
+            "password: ${DB_PASSWORD}",
+            "Authorization: Bearer ${ACCESS_TOKEN_VALUE}",
+            "The password: required rule stays.",
+            "sk-learn-integration-branch-2024",
+            "The password is encrypted at rest.",
+        ):
+            self.assertIsNone(find_credential(text), text)
 
     def test_ordinary_decisions_pass(self):
         for text in (
@@ -88,11 +117,42 @@ class FileTests(unittest.TestCase):
             read_memories(self.path)
 
     def test_a_union_merge_keeps_the_replaced_version(self):
-        base = {"id": "mem_1", "kind": "note", "text": "a", "source": "b", "created_at": "2026"}
-        lines = [json.dumps({**base, "superseded_by": "mem_2"}), json.dumps({**base, "superseded_by": None})]
+        base = {"id": "mem_1", "kind": "note", "text": "a", "source": "b", "created_at": "2026-01-01T00:00:00+00:00"}
+        newer = {**base, "id": "mem_2", "superseded_by": None}
+        lines = [json.dumps({**base, "superseded_by": "mem_2"}), json.dumps({**base, "superseded_by": None}), json.dumps(newer)]
         self.path.parent.mkdir(parents=True)
         self.path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         self.assertEqual(read_memories(self.path)[0].superseded_by, "mem_2")
+
+    def _write_line(self, **fields):
+        base = {"id": "mem_1", "kind": "note", "text": "a", "source": "b", "created_at": "2026-01-01T00:00:00+00:00"}
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text(json.dumps({**base, **fields}) + "\n", encoding="utf-8")
+
+    def test_invalid_lines_stop_with_their_number(self):
+        cases = (
+            {"kind": "bogus"},
+            {"created_at": "not-a-date"},
+            {"created_at": None},
+            {"text": ""},
+            {"source": "a\x00b"},
+            {"superseded_by": 7},
+            {"superseded_by": "mem_unknown"},
+            {"superseded_by": "mem_1"},
+        )
+        for fields in cases:
+            self._write_line(**fields)
+            with self.assertRaises(ValueError, msg=fields):
+                read_memories(self.path)
+            self.path.unlink()
+            self.path.parent.rmdir()
+
+    def test_a_credential_edited_into_the_file_stops_without_repeating_it(self):
+        self._write_line(text="DB_PASSWORD=abcd1234efgh")
+        with self.assertRaises(ValueError) as caught:
+            read_memories(self.path)
+        self.assertIn("secret assignment", str(caught.exception))
+        self.assertNotIn("abcd1234efgh", str(caught.exception))
 
 
 @unittest.skipUnless(_database_available(), "PostgreSQL is not running: docker compose up -d postgres")
@@ -234,6 +294,50 @@ class MemoryTests(unittest.TestCase):
         self.assertNotIn(old.id, current)
         self.assertEqual(self._recall("retries client", kind="convention")[0].source, "login handoff")
         self.assertEqual(self._sync().embedded, 0)
+
+    def test_line_separators_in_the_text_keep_the_file_readable(self):
+        for separator in ("\u2028", "\u2029", "\u0085", "\x0c"):
+            self._remember(f"first{separator}second")
+        self.assertEqual(len(read_memories(self.repo / DEFAULT_MEMORY_FILE)), 4)
+        self.assertEqual(self._sync().memories, 4)
+
+    def test_a_nul_in_the_source_does_not_damage_the_file(self):
+        memory = self._remember("A decision.", source="pa\x00ste")
+        self.assertEqual(memory.source, "paste")
+        self._sync()
+
+    def test_text_that_cannot_be_saved_is_refused(self):
+        with self.assertRaises(MemoryRefused):
+            self._remember("broken \ud800 text")
+        self.assertFalse((self.repo / DEFAULT_MEMORY_FILE).exists())
+
+    def test_a_replaced_memory_cannot_be_replaced_again(self):
+        old = self._remember("Decision A.", kind="decision")
+        self._remember("Decision B.", kind="decision", supersedes=old.id)
+        with self.assertRaisesRegex(MemoryRefused, "already replaced"):
+            self._remember("Decision C.", kind="decision", supersedes=old.id)
+
+    def test_repeating_a_replaced_text_does_not_revive_it(self):
+        old = self._remember("Decision A.", kind="decision")
+        new = self._remember("Decision B.", kind="decision", supersedes=old.id)
+        with self.assertRaisesRegex(MemoryRefused, new.id):
+            self._remember("Decision A.", kind="decision", source="other")
+        memories = {memory.id: memory for memory in read_memories(self.repo / DEFAULT_MEMORY_FILE)}
+        self.assertEqual(memories[old.id].superseded_by, new.id)
+        self.assertEqual(memories[old.id].source, "PR 12")
+
+    def test_repeating_a_current_memory_keeps_its_first_source(self):
+        first = self._remember("Decision A.")
+        again = self._remember("Decision A.", source="other")
+        self.assertEqual((again.id, again.source), (first.id, "PR 12"))
+
+    def test_index_applies_a_hand_edit_of_the_text(self):
+        memory = self._remember("Retries live in the client.", kind="decision")
+        path = self.repo / DEFAULT_MEMORY_FILE
+        path.write_text(path.read_text(encoding="utf-8").replace("in the client", "in the gateway"), encoding="utf-8")
+        self.assertEqual(self._sync().embedded, 1)
+        hit = self._recall("gateway", kind="decision")[0]
+        self.assertEqual((hit.memory_id, hit.text), (memory.id, "Retries live in the gateway."))
 
 
 if __name__ == "__main__":

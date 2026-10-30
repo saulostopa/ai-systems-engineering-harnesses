@@ -132,6 +132,14 @@ class McpToolTests(unittest.TestCase):
             )
         self.assertTrue(self._call("read_lines", path="src/link.ts").isError)
 
+    def test_search_does_not_serve_a_link_placed_after_indexing(self):
+        target = self.repo / "src" / "cart.ts"
+        target.unlink()
+        target.symlink_to(Path(self.temp.name) / "outside.txt")
+        hits = self._ok("search_code", query="addToCart")["hits"]
+        self.assertNotIn("src/cart.ts", {hit["path"] for hit in hits})
+        self.assertTrue(self._call("read_lines", path="src/cart.ts").isError)
+
     def test_remember_and_recall_share_the_versioned_file(self):
         saved = self._ok("remember", text="Carts are saved on the server.", source="PR 7", kind="decision")
         self.assertEqual(saved["file"], "docs/harness/memories.jsonl")

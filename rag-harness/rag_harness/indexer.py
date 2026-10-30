@@ -97,7 +97,8 @@ def _git_files(root: str) -> list[str] | None:
         )
     except (OSError, subprocess.CalledProcessError):
         return None
-    return [p for p in result.stdout.decode("utf-8").split("\0") if p]
+    # A path Git holds in another encoding must not take the whole index down.
+    return [p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
 
 
 def _walk_files(root: str) -> list[str]:

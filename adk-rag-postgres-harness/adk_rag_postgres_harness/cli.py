@@ -18,6 +18,7 @@ def main() -> None:
     index_parser = sub.add_parser("index", help="sync a repository, embedding only what changed")
     index_parser.add_argument("root")
     index_parser.add_argument("--project", help="defaults to the folder name")
+    index_parser.add_argument("--move", action="store_true", help="the project now lives in this folder")
 
     search_parser = sub.add_parser("search", help="hybrid search; text comes from disk")
     search_parser.add_argument("query")
@@ -65,7 +66,12 @@ def main() -> None:
     elif args.command == "index":
         from .ingest import sync
 
-        report = sync(args.root, args.project, verbose=True)
+        try:
+            report = sync(args.root, args.project, verbose=True, move=args.move)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        for path, reason in report.skipped:
+            print(f"skipped {path}: {reason}")
         print(
             f"{report.project}: {report.files} files, {report.changed} changed, {report.removed} removed, "
             f"{report.embedded} chunks embedded with {report.model}, {report.memories} memories restored"

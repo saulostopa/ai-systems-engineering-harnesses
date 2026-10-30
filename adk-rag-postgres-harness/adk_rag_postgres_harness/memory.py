@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .embeddings import embed_query, embed_texts, embedder_id, memory_embedder
-from .retrieval import read_lines
+from .retrieval import read_lines, safe_file
 from .store import PostgresStore
 
 DEFAULT_MEMORY_FILE = "docs/harness/memories.jsonl"
@@ -23,17 +23,33 @@ HANDOFF_PATHS = r"^docs/harness/(session-handoff\.md|features/[^/]+/(progress|ha
 
 _CREDENTIALS = {
     "private key": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-    "API key": re.compile(r"\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}"),
+    # One long random part, so a name like `sk-learn-integration` passes.
+    "API key": re.compile(r"\b(?:sk|pk|rk)-(?:[A-Za-z0-9]+[-_])*[A-Za-z0-9]{16,}"),
+    "Stripe key": re.compile(r"\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{10,}"),
+    "GitLab token": re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}"),
+    "npm token": re.compile(r"\bnpm_[A-Za-z0-9]{20,}"),
+    "bearer token": re.compile(r"(?i)\bbearer\s+(?P<value>[A-Za-z0-9._~+/$<{-]{16,}=*)"),
     "AWS key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "GitHub token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"),
     "Slack token": re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
     "Google key": re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"),
     "JWT": re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
     "URL with a password": re.compile(r"\b[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@"),
+    # No left boundary, because `\\b` does not match after `_` in `DB_PASSWORD`.
     "secret assignment": re.compile(
-        r"(?i)\b(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)\b[\"']?\s*[:=]\s*[\"']?[^\s\"']{8,}"
+        r"(?i)(?:password|passwd|pwd|senha|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)"
+        r"(?:[_-](?:key|value|access[_-]key))?[\"']?\s*[:=]\s*[\"']?(?P<value>[^\s\"',;]{8,})"
+    ),
+    # In prose only a value with a digit or symbol counts: "the password is encrypted" passes.
+    "secret in a sentence": re.compile(
+        r"(?i)\b(?:password|senha|secret)\s+(?:is|é)\s+(?P<value>(?=\S*[0-9!@#$%^&*])\S{8,})"
     ),
 }
+# Values that name a secret or describe a field, instead of holding one.
+_NOT_A_VALUE = re.compile(
+    r"(?i)^(?:process\.env|os\.environ|import\.meta\.env|env\.|[$<{%]|\S*\()"
+    r"|^(?:required|optional|undefined|string|boolean|disabled|enabled|validated)\b"
+)
 
 
 class MemoryRefused(ValueError):
@@ -72,8 +88,9 @@ def find_credential(text: str) -> str | None:
     """The kind of credential found, never its value, so errors cannot leak it."""
 
     for kind, pattern in _CREDENTIALS.items():
-        if pattern.search(text):
-            return kind
+        for match in pattern.finditer(text):
+            if "value" not in pattern.groupindex or not _NOT_A_VALUE.search(match["value"]):
+                return kind
     return None
 
 
@@ -85,22 +102,51 @@ def text_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _check_memory(raw: dict) -> Memory:
+    """A line the database can hold; errors never repeat its content."""
+
+    memory = Memory(**raw)
+    fields = (memory.id, memory.kind, memory.text, memory.source, memory.created_at)
+    if not all(isinstance(value, str) and value and "\x00" not in value for value in fields):
+        raise ValueError("a field is empty or not valid text")
+    if not isinstance(memory.superseded_by, (str, type(None))):
+        raise ValueError("superseded_by is not an id")
+    if memory.kind not in KINDS:
+        raise ValueError(f"the kind must be one of {', '.join(KINDS)}")
+    datetime.fromisoformat(memory.created_at)
+    credential = find_credential(f"{memory.text}\n{memory.source}")
+    if credential:
+        raise ValueError(f"it looks like it contains a credential ({credential}); remove it and rotate it")
+    return memory
+
+
 def read_memories(path: Path) -> list[Memory]:
     """Read the file; a damaged line stops here, so it can never be overwritten."""
 
     if not path.is_file():
         return []
     merged: dict[str, Memory] = {}
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    # Only "\\n" ends a line: `splitlines` also splits on U+2028, which JSON keeps as text.
+    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         if not line.strip():
             continue
         try:
-            memory = Memory(**json.loads(line))
-        except (json.JSONDecodeError, TypeError) as exc:
+            memory = _check_memory(json.loads(line))
+        except json.JSONDecodeError as exc:
             raise ValueError(f"{path}:{number} is not a valid memory; fix the file first (a merge conflict?)") from exc
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{path}:{number} is not a valid memory: {exc}") from exc
         # A union merge can keep two versions of a line; the replaced one wins.
         previous = merged.get(memory.id)
         merged[memory.id] = memory if previous is None or memory.superseded_by else previous
+    for memory in merged.values():
+        seen = {memory.id}
+        following = memory.superseded_by
+        while following:
+            if following not in merged or following in seen:
+                raise ValueError(f"{path}: {memory.id} would stay hidden forever: fix its superseded_by")
+            seen.add(following)
+            following = merged[following].superseded_by
     return sorted(merged.values(), key=lambda item: (item.created_at, item.id))
 
 
@@ -138,7 +184,11 @@ def remember(
     """Save a memory to the file and the database; returns it and whether it has a vector yet."""
 
     text = text.replace("\x00", "").strip()
-    source = source.strip()
+    source = source.replace("\x00", "").strip()
+    try:
+        f"{text}{source}".encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise MemoryRefused("the text has characters that cannot be saved") from exc
     if kind not in KINDS:
         raise MemoryRefused(f"unknown kind {kind!r}; use one of {', '.join(KINDS)}")
     if not text or not source:
@@ -162,9 +212,13 @@ def remember(
         memories = {memory.id: memory for memory in read_memories(path)}
         if supersedes and supersedes not in memories:
             raise MemoryRefused(f"unknown memory {supersedes!r}")
+        if supersedes and memories[supersedes].superseded_by:
+            raise MemoryRefused(f"{supersedes} was already replaced by {memories[supersedes].superseded_by}; replace that one")
         existing = memories.get(new_id)
-        created_at = existing.created_at if existing else datetime.now(timezone.utc).isoformat(timespec="seconds")
-        memory = Memory(new_id, kind, text, source, created_at)
+        if existing and existing.superseded_by:
+            raise MemoryRefused(f"this text was replaced by {existing.superseded_by}; reword it to make a new decision")
+        # Repeating a memory keeps its first source and date.
+        memory = existing or Memory(new_id, kind, text, source, datetime.now(timezone.utc).isoformat(timespec="seconds"))
         memories[new_id] = memory
         if supersedes:
             memories[supersedes] = replace(memories[supersedes], superseded_by=new_id)
@@ -218,8 +272,8 @@ def recall(
                 superseded_by=row["superseded_by"],
             ))
             continue
-        full = Path(found["root"]) / row["path"]
-        if not full.is_file():
+        full = safe_file(found["root"], row["path"])
+        if full is None:
             continue
         hits.append(RecallHit(
             "file",

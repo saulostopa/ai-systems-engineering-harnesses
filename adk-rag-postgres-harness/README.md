@@ -55,10 +55,14 @@ branches without conflicts, add `docs/harness/memories.jsonl merge=union` to the
 repository's `.gitattributes`.
 
 - **Credentials:** `remember` refuses text or sources that look like a credential,
-  without repeating the value. The check uses patterns, so it reduces the risk but
-  does not replace reviewing the file in the diff.
+  without repeating the value, and `index` stops on one edited into the file. The
+  check uses patterns, so it reduces the risk but does not replace reviewing the file
+  in the diff.
 - **Replacing a decision:** `--supersedes <id>` keeps the old memory in the file and
-  hides it from `recall`, unless you pass `--include-superseded`.
+  hides it from `recall`, unless you pass `--include-superseded`. A memory is replaced
+  only once, and repeating a replaced text is refused instead of bringing it back.
+- **Editing by hand:** `index` validates the file and applies the edits. An invalid
+  line stops it with the line number.
 - **Feature logs:** `recall` also searches `docs/harness/session-handoff.md` and each
   feature's `progress.md` and `handoff.md`. They are already versioned and indexed,
   so they are not copied into the memory file.
@@ -82,8 +86,8 @@ Code has been tested.
 
 - **Always loaded:** the tools set `anthropic/alwaysLoad`. Otherwise Claude Code hides
   them behind its tool search, and the agent uses grep without ever seeing them.
-- **Reading files:** `read_lines` serves indexed files only, so `.env` and anything
-  outside the repository stay out of reach, and it returns at most 400 lines per call.
+- **Reading files:** `read_lines` serves indexed files only, up to 400 lines per call,
+  and neither it nor the search follows a link. See what stays out of the index below.
 - **Failures:** the tools return an error that says what to do. Without Ollama,
   `search_code` and `recall` fail, while `remember`, `find_symbol` and `read_lines`
   keep working.
@@ -95,6 +99,12 @@ Code has been tested.
 ## How it works
 
 - **Discovery:** files come from Git and `.ragignore`, as in `rag-harness`.
+- **Left out:** symbolic links, names that start with `.env` or contain `secret` or
+  `credential`, binary and unreadable files, files over 512 KB and lines over 5,000
+  bytes. `index` lists each one with its reason, and they do not stop the others. The
+  name check also leaves out code such as `useCredentials.ts`.
+- **Moving a project:** `index` refuses a missing folder, and a folder other than the
+  one the project was indexed from unless you pass `--move`.
 - **Syntax-aware chunks:** tree-sitter splits TS, TSX and JS into components,
   hooks, functions, classes and types, with their leading comments. Definitions
   over 80 lines split between statements; short neighbors stay together. Python

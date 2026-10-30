@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import uuid
 from pathlib import Path
@@ -13,8 +16,8 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
 
 from adk_rag_postgres_harness.embeddings import EMBED_DIM
-from adk_rag_postgres_harness.ingest import sync
-from adk_rag_postgres_harness.retrieval import find_symbol, search_code, where_used
+from adk_rag_postgres_harness.ingest import MAX_FILE_BYTES, MAX_LINE_BYTES, sync
+from adk_rag_postgres_harness.retrieval import find_symbol, read_file, search_code, where_used
 from adk_rag_postgres_harness.store import PostgresStore, database_url
 from rag_harness.embeddings import NGramEmbedder
 
@@ -189,6 +192,137 @@ class SyncTests(unittest.TestCase):
             found["id"], NGramEmbedder(dim=EMBED_DIM).embed("login"), "test:a", force_index=True
         )
         self.assertIn("embeddings_vector_idx", plan)
+
+    def _indexed_paths(self) -> set[str]:
+        return set(self.store.file_states(self.store.project("shop")["id"]))
+
+    def _stored_text(self) -> str:
+        with self.store.connect() as conn:
+            return "\n".join(row["content"] for row in conn.execute("SELECT content FROM chunks"))
+
+    def test_problem_files_are_skipped_and_the_rest_still_syncs(self):
+        self._write("big.txt", "line\n" * (MAX_FILE_BYTES // 5 + 1))
+        self._write("data.json", '{"a": "' + "x" * (MAX_LINE_BYTES + 1) + '"}')
+        (self.repo / "blob.txt").write_bytes(b"abc\0def")
+        self._write("locked.md", "no access")
+        (self.repo / "locked.md").chmod(0)
+        self._write("src/new.ts", "export const probe = 1;\n")
+
+        report = self._sync()
+
+        reasons = dict(report.skipped)
+        self.assertIn("bytes", reasons["big.txt"])
+        self.assertIn("line", reasons["data.json"])
+        self.assertEqual(reasons["blob.txt"], "binary")
+        if os.geteuid() != 0:
+            self.assertIn("unreadable", reasons["locked.md"])
+        self.assertEqual(find_symbol("probe", "shop", store=self.store)[0]["path"], "src/new.ts")
+        self.assertNotIn("big.txt", self._indexed_paths())
+
+    def test_the_largest_accepted_file_fits_full_text(self):
+        # Unique words are the worst case for the 1 MB limit of a tsvector.
+        line = lambda number: " ".join(f"word{number}x{column}" for column in range(MAX_LINE_BYTES // 16))
+        lines, size = [], 0
+        while size + MAX_LINE_BYTES < MAX_FILE_BYTES:
+            lines.append(line(len(lines)))
+            size += len(lines[-1]) + 1
+        self._write("words.txt", "\n".join(lines))
+        report = self._sync()
+        self.assertEqual(report.skipped, ())
+        self.assertIn("words.txt", self._indexed_paths())
+
+    def test_a_file_that_grows_too_big_leaves_the_index(self):
+        self._sync()
+        self._write("src/cart.ts", "x" * (MAX_LINE_BYTES + 1))
+        self.assertEqual(self._sync().removed, 1)
+        self.assertNotIn("src/cart.ts", self._indexed_paths())
+
+    def test_links_and_sensitive_names_never_reach_the_database(self):
+        outside = Path(self.temp.name) / "creds.txt"
+        outside.write_text("OUTSIDE-MARKER\n", encoding="utf-8")
+        self._write(".env", "DOTENV-MARKER\n")
+        (self.repo / "link.txt").symlink_to(outside)
+        (self.repo / "env.txt").symlink_to(self.repo / ".env")
+        (self.repo / "linked").symlink_to(Path(self.temp.name))
+        for name in (".env.yaml", ".secrets.json", "client_secret.json", "credentials.txt"):
+            self._write(name, "NAME-MARKER\n")
+
+        reasons = dict(self._sync().skipped)
+
+        self.assertEqual(reasons["link.txt"], "symbolic link")
+        self.assertEqual(reasons["env.txt"], "symbolic link")
+        self.assertEqual(reasons[".secrets.json"], "sensitive name")
+        stored = self._stored_text()
+        for marker in ("OUTSIDE-MARKER", "DOTENV-MARKER", "NAME-MARKER"):
+            self.assertNotIn(marker, stored)
+
+    def test_a_file_replaced_by_a_link_after_indexing_is_not_served(self):
+        self._sync()
+        outside = Path(self.temp.name) / "creds.txt"
+        outside.write_text("OUTSIDE-MARKER\n", encoding="utf-8")
+        target = self.repo / "src/cart.ts"
+        target.unlink()
+        target.symlink_to(outside)
+
+        hits = self._search("addToCart")
+        self.assertNotIn("src/cart.ts", {hit.path for hit in hits})
+        self.assertFalse(any("OUTSIDE-MARKER" in hit.text for hit in hits))
+        with self.assertRaises(ValueError):
+            read_file("src/cart.ts", "shop", store=self.store)
+
+    def test_a_path_in_another_encoding_does_not_stop_the_sync(self):
+        subprocess.run(["git", "init", "-q"], cwd=self.repo, check=True)
+        blob = subprocess.run(
+            ["git", "hash-object", "-w", "--stdin"], cwd=self.repo, input=b"x", capture_output=True, check=True
+        ).stdout.decode().strip()
+        subprocess.run(
+            ["git", "update-index", "--add", "--cacheinfo", f"100644,{blob},".encode() + b"bad\xff.md"],
+            cwd=self.repo, check=True,
+        )
+        self.assertEqual(self._sync().files, 3)
+
+    def test_a_missing_folder_changes_nothing(self):
+        self._sync()
+        with self.assertRaisesRegex(ValueError, "not a folder"):
+            sync(str(self.repo / "nope"), "shop", embedder=self.embedder, store=self.store)
+        self.assertEqual(len(self._indexed_paths()), 3)
+        self.assertEqual(self.store.project("shop")["root"], str(self.repo.resolve()))
+
+    def test_another_folder_needs_move(self):
+        self._sync()
+        other = Path(self.temp.name) / "other"
+        other.mkdir()
+        (other / "a.md").write_text("Other.\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "--move"):
+            sync(str(other), "shop", embedder=self.embedder, store=self.store)
+        self.assertEqual(self.store.project("shop")["root"], str(self.repo.resolve()))
+
+        sync(str(other), "shop", embedder=self.embedder, store=self.store, move=True)
+        self.assertEqual(self.store.project("shop")["root"], str(other.resolve()))
+        self.assertEqual(self._indexed_paths(), {"a.md"})
+
+    def test_parallel_syncs_do_not_collide(self):
+        errors = []
+
+        def run():
+            try:
+                self._sync(CountingEmbedder())
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=run) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(len(self._indexed_paths()), 3)
+
+    def test_uses_finds_packages_and_normalizes_paths(self):
+        self._write("src/page.ts", "import { navigate } from '@scope/nav';\nimport { addToCart } from './cart';\nexport const a = 1;\n")
+        self._sync()
+        for name in ("@scope/nav", "./src/cart.ts", "src/cart.ts"):
+            self.assertEqual([row["path"] for row in where_used(name, "shop", store=self.store)], ["src/page.ts"], name)
 
 
 if __name__ == "__main__":

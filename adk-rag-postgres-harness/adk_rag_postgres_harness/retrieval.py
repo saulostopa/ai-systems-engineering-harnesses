@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import posixpath
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,6 +46,18 @@ def read_lines(path: Path, start_line: int, end_line: int) -> str:
     return "\n".join(lines[start_line - 1:end_line])
 
 
+def safe_file(root: str | Path, relative: str) -> Path | None:
+    """The file inside the repository, or None for anything a link could lead away from it."""
+
+    base = Path(root).resolve()
+    full = base / relative
+    try:
+        inside = full.resolve() == full and full.is_relative_to(base)
+    except (OSError, RuntimeError):
+        return None
+    return full if inside and full.is_file() else None
+
+
 def read_file(
     path: str,
     project: str,
@@ -59,12 +72,11 @@ def read_file(
     if found is None:
         raise ValueError(f"unknown project {project!r}; index it first")
     state = store.file_states(found["id"]).get(path)
-    root = Path(found["root"]).resolve()
-    full = (root / path).resolve()
-    if state is None or not full.is_relative_to(root):
+    if state is None:
         raise ValueError(f"{path!r} is not an indexed file of {project!r}")
-    if not full.is_file():
-        raise ValueError(f"{path!r} no longer exists; run the index again")
+    full = safe_file(found["root"], path)
+    if full is None:
+        raise ValueError(f"{path!r} no longer exists or became a link; run the index again")
     if start_line < 1 or (end_line is not None and end_line < start_line):
         raise ValueError(f"invalid line range {start_line}-{end_line}")
 
@@ -95,12 +107,12 @@ def find_symbol(name: str, project: str, store: PostgresStore | None = None, lim
 
 
 def where_used(name: str, project: str, store: PostgresStore | None = None, limit: int = 50) -> list[dict]:
-    """Importers of a name, or of a file when `name` is an indexed path."""
+    """Importers of a name or package, or of a file when `name` is a path."""
 
     store = store or PostgresStore()
     project_id = _project_id(store, project)
     if "/" in name:
-        return store.find_importers(project_id, name, path=name, limit=limit)
+        return store.find_importers(project_id, name, path=posixpath.normpath(name), limit=limit)
     return store.find_importers(project_id, name, limit=limit)
 
 
@@ -120,11 +132,10 @@ def search_code(
     rows = store.search(
         found["id"], query, embed_query(embedder, query), embedder_id(embedder), collection, top_k
     )
-    root = Path(found["root"])
     hits: list[Hit] = []
     for row in rows:
-        full = root / row["path"]
-        if not full.is_file():
+        full = safe_file(found["root"], row["path"])
+        if full is None:
             continue
         hits.append(Hit(
             path=row["path"],

@@ -102,6 +102,7 @@ class PostgresStore:
     def migrate(self, migrations_dir: str | Path | None = None) -> None:
         root = Path(migrations_dir or Path(__file__).parents[1] / "migrations")
         with self.connect() as conn:
+            conn.execute("SELECT pg_advisory_xact_lock(0, 0)")
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
                 "name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
@@ -218,9 +219,13 @@ class PostgresStore:
             ))
 
     def find_importers(self, project_id: int, name: str, path: str | None = None, limit: int = 50) -> list[dict]:
-        """Files that import a name, or everything that imports a file when `path` is given."""
+        """Files that import a name or a package, or everything that imports a file when `path` is given."""
 
-        scope = "e.resolved_path = %(path)s" if path else "(lower(e.name) = lower(%(name)s) OR lower(e.alias) = lower(%(name)s))"
+        scope = (
+            "(e.resolved_path = %(path)s OR e.specifier = %(name)s)"
+            if path
+            else "(lower(e.name) = lower(%(name)s) OR lower(e.alias) = lower(%(name)s) OR e.specifier = %(name)s)"
+        )
         with self.connect() as conn:
             return list(conn.execute(
                 f"""
@@ -253,6 +258,14 @@ class PostgresStore:
             ))
 
     @contextlib.contextmanager
+    def sync_lock(self, project_id: int):
+        """Serialize runs that change a project's files; the embedding after it runs unlocked."""
+
+        with self.connect() as conn:
+            conn.execute("SELECT pg_advisory_xact_lock(1, %s)", (project_id,))
+            yield
+
+    @contextlib.contextmanager
     def memory_lock(self, project_id: int):
         """Serialize writers of a project's memory file, such as two MCP clients."""
 
@@ -275,9 +288,13 @@ class PostgresStore:
                     project_id, id, kind, text, source, created_at, superseded_by, content_hash, search_text
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (project_id, id) DO UPDATE SET
+                    kind = EXCLUDED.kind,
+                    text = EXCLUDED.text,
                     source = EXCLUDED.source,
                     created_at = EXCLUDED.created_at,
-                    superseded_by = EXCLUDED.superseded_by
+                    superseded_by = EXCLUDED.superseded_by,
+                    content_hash = EXCLUDED.content_hash,
+                    search_text = EXCLUDED.search_text
                 """,
                 [
                     (
