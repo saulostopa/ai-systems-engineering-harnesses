@@ -27,6 +27,28 @@ class Hit:
     stale: bool
 
 
+def _project_id(store: PostgresStore, project: str) -> int:
+    found = store.project(project)
+    if found is None:
+        raise ValueError(f"unknown project {project!r}; index it first")
+    return found["id"]
+
+
+def find_symbol(name: str, project: str, store: PostgresStore | None = None, limit: int = 20) -> list[dict]:
+    store = store or PostgresStore()
+    return store.find_symbols(_project_id(store, project), name, limit)
+
+
+def where_used(name: str, project: str, store: PostgresStore | None = None, limit: int = 50) -> list[dict]:
+    """Importers of a name, or of a file when `name` is an indexed path."""
+
+    store = store or PostgresStore()
+    project_id = _project_id(store, project)
+    if "/" in name:
+        return store.find_importers(project_id, name, path=name, limit=limit)
+    return store.find_importers(project_id, name, limit=limit)
+
+
 def search_code(
     query: str,
     project: str,

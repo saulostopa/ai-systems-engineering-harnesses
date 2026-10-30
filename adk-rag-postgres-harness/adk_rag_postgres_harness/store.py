@@ -84,6 +84,9 @@ class FileRow:
     collection: str
     language: str
     chunks: tuple[ChunkRow, ...]
+    chunker_version: int = 1
+    symbols: tuple = ()
+    imports: tuple = ()
 
 
 class PostgresStore:
@@ -123,10 +126,12 @@ class PostgresStore:
         with self.connect() as conn:
             return conn.execute("SELECT id, name, root FROM projects WHERE name = %s", (name,)).fetchone()
 
-    def file_hashes(self, project_id: int) -> dict[str, str]:
+    def file_states(self, project_id: int) -> dict[str, tuple[str, int]]:
         with self.connect() as conn:
-            rows = conn.execute("SELECT path, content_hash FROM files WHERE project_id = %s", (project_id,))
-            return {row["path"]: row["content_hash"] for row in rows}
+            rows = conn.execute(
+                "SELECT path, content_hash, chunker_version FROM files WHERE project_id = %s", (project_id,)
+            )
+            return {row["path"]: (row["content_hash"], row["chunker_version"]) for row in rows}
 
     def apply_changes(self, project_id: int, changed: Iterable[FileRow], removed: Iterable[str]) -> None:
         """Replace changed files and their chunks in one transaction."""
@@ -139,10 +144,10 @@ class PostgresStore:
                 for file in changed:
                     file_id = cursor.execute(
                         """
-                        INSERT INTO files (project_id, path, content_hash, collection, language)
-                        VALUES (%s, %s, %s, %s, %s) RETURNING id
+                        INSERT INTO files (project_id, path, content_hash, collection, language, chunker_version)
+                        VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
                         """,
-                        (project_id, file.path, file.content_hash, file.collection, file.language),
+                        (project_id, file.path, file.content_hash, file.collection, file.language, file.chunker_version),
                     ).fetchone()["id"]
                     cursor.executemany(
                         """
@@ -160,6 +165,71 @@ class PostgresStore:
                             for chunk in file.chunks
                         ],
                     )
+                    cursor.executemany(
+                        """
+                        INSERT INTO symbols (project_id, file_id, name, kind, parent, exported, start_line, end_line)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        [
+                            (project_id, file_id, s.name, s.kind, s.parent, s.exported, s.start_line, s.end_line)
+                            for s in file.symbols
+                        ],
+                    )
+                    cursor.executemany(
+                        "INSERT INTO edges (project_id, file_id, specifier, name, alias) VALUES (%s, %s, %s, %s, %s)",
+                        [(project_id, file_id, ref.specifier, ref.name, ref.alias) for ref in file.imports],
+                    )
+
+    def import_edges(self, project_id: int) -> list[dict]:
+        with self.connect() as conn:
+            return list(conn.execute(
+                """
+                SELECT e.id, f.path, e.specifier, e.resolved_path
+                FROM edges e JOIN files f ON f.id = e.file_id
+                WHERE e.project_id = %s
+                """,
+                (project_id,),
+            ))
+
+    def set_resolved_paths(self, updates: Iterable[tuple[str | None, int]]) -> None:
+        with self.connect() as conn, conn.cursor() as cursor:
+            cursor.executemany("UPDATE edges SET resolved_path = %s WHERE id = %s", list(updates))
+
+    def find_symbols(self, project_id: int, name: str, limit: int = 20) -> list[dict]:
+        """Exact name first, ignoring case, then names that contain it."""
+
+        with self.connect() as conn:
+            return list(conn.execute(
+                """
+                SELECT s.name, s.kind, s.parent, s.exported, s.start_line, s.end_line, f.path
+                FROM symbols s JOIN files f ON f.id = s.file_id
+                WHERE s.project_id = %(project_id)s AND lower(s.name) LIKE %(pattern)s
+                ORDER BY lower(s.name) = lower(%(name)s) DESC, s.exported DESC, length(s.name), f.path, s.start_line
+                LIMIT %(limit)s
+                """,
+                {
+                    "project_id": project_id,
+                    "name": name,
+                    "pattern": "%" + name.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%",
+                    "limit": limit,
+                },
+            ))
+
+    def find_importers(self, project_id: int, name: str, path: str | None = None, limit: int = 50) -> list[dict]:
+        """Files that import a name, or everything that imports a file when `path` is given."""
+
+        scope = "e.resolved_path = %(path)s" if path else "(lower(e.name) = lower(%(name)s) OR lower(e.alias) = lower(%(name)s))"
+        with self.connect() as conn:
+            return list(conn.execute(
+                f"""
+                SELECT DISTINCT f.path, e.specifier, e.name, e.alias, e.resolved_path
+                FROM edges e JOIN files f ON f.id = e.file_id
+                WHERE e.project_id = %(project_id)s AND {scope}
+                ORDER BY f.path, e.specifier, e.name
+                LIMIT %(limit)s
+                """,
+                {"project_id": project_id, "name": name, "path": path, "limit": limit},
+            ))
 
     def missing_embeddings(self, project_id: int, model: str) -> list[dict]:
         """Chunks without a vector for this model, so a changed model or a crash just resumes."""

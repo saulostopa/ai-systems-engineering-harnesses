@@ -3,9 +3,9 @@
 A code memory on PostgreSQL and `pgvector`, built from open source parts. It
 keeps a repository indexed incrementally and searches it by meaning and by text.
 
-The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phase 1
-is done: the Postgres core, incremental sync and hybrid search. Syntax-aware
-TypeScript chunks, memory, the MCP server and the ADK wiring come next.
+The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases 1
+and 2 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
+chunks, symbols and imports. Memory, the MCP server and the ADK wiring come next.
 
 ## Start
 
@@ -27,14 +27,28 @@ uv run python -m adk_rag_postgres_harness.cli search "where is the login handled
 ```
 
 Use `--collection code` or `docs` to narrow a search, and `--json` to get the
-text of each result. `tests/test_sync.py` needs the container running and creates
+text of each result. To go from a name to its definition and its importers:
+
+```bash
+uv run python -m adk_rag_postgres_harness.cli symbol useUser --project my-repo
+uv run python -m adk_rag_postgres_harness.cli uses useUser --project my-repo
+uv run python -m adk_rag_postgres_harness.cli uses src/contexts/user/useUser.tsx --project my-repo
+```
+
+`tests/test_sync.py` needs the container running and creates
 a temporary database for each test; without the container it is skipped.
 
 ## How it works
 
 - **Discovery:** files come from Git and `.ragignore`, as in `rag-harness`.
-- **Incremental sync:** a file is chunked again only when its hash changes.
-  Chunks are saved before embedding, so an interrupted run resumes on the next one.
+- **Syntax-aware chunks:** tree-sitter splits TS, TSX and JS into components,
+  hooks, functions, classes and types, with their leading comments. Definitions
+  over 80 lines split between statements; short neighbors stay together. Python
+  keeps its AST chunks, and other files keep line chunks.
+- **Symbols and imports:** definitions and imports are stored per file. Imports
+  resolve to indexed files through relative paths and the `tsconfig.json` aliases.
+- **Incremental sync:** a file is chunked again only when its hash or the chunker
+  version changes. Chunks are saved before embedding, so an interrupted run resumes on the next one.
 - **Embedding cache:** `embeddings` is keyed by content hash and model. Identical
   text is embedded once, vectors of several models coexist, and returning to a
   model recomputes nothing.

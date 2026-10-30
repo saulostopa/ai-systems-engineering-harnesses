@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from adk_rag_postgres_harness.embeddings import EMBED_DIM
 from adk_rag_postgres_harness.ingest import sync
-from adk_rag_postgres_harness.retrieval import search_code
+from adk_rag_postgres_harness.retrieval import find_symbol, search_code, where_used
 from adk_rag_postgres_harness.store import PostgresStore, database_url
 from rag_harness.embeddings import NGramEmbedder
 
@@ -151,6 +151,36 @@ class SyncTests(unittest.TestCase):
         hit = next(hit for hit in self._search("handleLogin") if hit.path == "src/login.ts")
         self.assertIn("signIn", hit.text)
         self.assertTrue(hit.stale)
+
+    def test_find_symbol_and_where_used(self):
+        self._write("src/app.ts", "import { handleLogin } from './login';\nhandleLogin(user);\n")
+        self._sync()
+        definition = find_symbol("handleLogin", "shop", store=self.store)[0]
+        self.assertEqual((definition["path"], definition["kind"], definition["exported"]), ("src/login.ts", "function", True))
+        self.assertEqual(find_symbol("handlelog", "shop", store=self.store)[0]["name"], "handleLogin")
+        self.assertEqual([row["path"] for row in where_used("handleLogin", "shop", store=self.store)], ["src/app.ts"])
+        self.assertEqual([row["path"] for row in where_used("src/login.ts", "shop", store=self.store)], ["src/app.ts"])
+
+    def test_new_file_resolves_imports_of_unchanged_files(self):
+        self._write("src/app.ts", "import { later } from './later';\n")
+        self._sync()
+        self.assertIsNone(where_used("later", "shop", store=self.store)[0]["resolved_path"])
+        self._write("src/later.ts", "export const later = 1;\n")
+        self._sync()
+        self.assertEqual(where_used("later", "shop", store=self.store)[0]["resolved_path"], "src/later.ts")
+
+    def test_deleted_file_removes_its_symbols(self):
+        self._sync()
+        (self.repo / "src/login.ts").unlink()
+        self._sync()
+        self.assertEqual(find_symbol("handleLogin", "shop", store=self.store), [])
+
+    def test_a_new_chunker_version_chunks_again_and_reuses_vectors(self):
+        self._sync()
+        with self.store.connect() as conn:
+            conn.execute("UPDATE files SET chunker_version = 1")
+        report = self._sync()
+        self.assertEqual((report.changed, report.embedded), (3, 0))
 
     def test_vector_candidates_can_use_the_hnsw_index(self):
         self._sync()
