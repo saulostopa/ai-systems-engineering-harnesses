@@ -1,0 +1,44 @@
+{
+  "project": "biometrik",
+  "note": "A result counts when any file in `relevant` appears. `evidence` is text that must exist in each file, so a question cannot silently go stale. Questions with no relevant file have no answer in the repository.",
+  "questions": [
+    {"id": "c01", "type": "code", "lang": "pt", "question": "Onde a sessão salva é validada quando o app abre?", "relevant": ["src/contexts/user/UserProvider.tsx"], "evidence": "authUserSchema"},
+    {"id": "c02", "type": "code", "lang": "pt", "question": "O que acontece quando a API responde 401?", "relevant": ["src/lib/biometrik-api/http.ts", "src/contexts/user/UserProvider.tsx"], "evidence": "401|onSessionRejected"},
+    {"id": "c03", "type": "code", "lang": "pt", "question": "Onde o token de autenticação fica guardado?", "relevant": ["src/lib/biometrik-api/tokenStore.ts"], "evidence": "AsyncStorage"},
+    {"id": "c04", "type": "code", "lang": "pt", "question": "Como o app escolhe a imagem de fundo da tela de abertura?", "relevant": ["src/utils/splashBackground.ts"], "evidence": "Math.random"},
+    {"id": "c05", "type": "code", "lang": "pt", "question": "Onde o usuário troca o idioma do app?", "relevant": ["src/screens/Logged/Profile/index.tsx", "src/i18n/index.ts"], "evidence": "changeLanguage"},
+    {"id": "c06", "type": "code", "lang": "pt", "question": "Onde fica o login com Google e Apple?", "relevant": ["src/contexts/user/UserProvider.tsx"], "evidence": "GoogleSignin"},
+    {"id": "c07", "type": "code", "lang": "pt", "question": "Qual tela mostra a sequência de dias de treino do usuário?", "relevant": ["src/screens/Logged/FeedTab/index.tsx", "src/components/StreakFlame/index.tsx"], "evidence": "[Ss]treak"},
+    {"id": "c08", "type": "code", "lang": "pt", "question": "Onde o usuário registra o peso corporal?", "relevant": ["src/components/WeightModal/index.tsx", "src/lib/biometrik-api/endpoints/bodyWeight.ts"], "evidence": "bodyWeight"},
+    {"id": "c09", "type": "code", "lang": "pt", "question": "Como o app sabe que o usuário já viu a introdução?", "relevant": ["src/utils/onboarding.ts"], "evidence": "AsyncStorage"},
+    {"id": "c10", "type": "code", "lang": "pt", "question": "Como um erro da API vira uma mensagem para o usuário?", "relevant": ["src/lib/biometrik-api/errors.ts"], "evidence": "getApiErrorMessage"},
+    {"id": "c11", "type": "code", "lang": "pt", "question": "Como o vídeo do exercício é tocado durante o treino?", "relevant": ["src/screens/Logged/Player/ExercisePage/index.tsx", "src/components/Video/index.tsx", "src/contexts/player/PlayerProvider.tsx"], "evidence": "[Vv]ideo"},
+    {"id": "c12", "type": "code", "lang": "en", "question": "Where is the API base URL configured?", "relevant": ["src/lib/biometrik-api/config.ts"], "evidence": "baseUrl|baseURL|API"},
+    {"id": "c13", "type": "code", "lang": "en", "question": "How are request timeouts handled?", "relevant": ["src/lib/biometrik-api/http.ts"], "evidence": "[Tt]imeout"},
+    {"id": "c14", "type": "code", "lang": "en", "question": "Which screens let the user pick the exercises of a new training?", "relevant": ["src/screens/Logged/NewTraining/SelectExercises/index.tsx"], "evidence": "Exercise"},
+    {"id": "c15", "type": "code", "lang": "en", "question": "What does logging out clear from the device?", "relevant": ["src/contexts/user/UserProvider.tsx"], "evidence": "signOut"},
+
+    {"id": "s01", "type": "symbol", "lang": "pt", "question": "Onde fica o hook useUser?", "relevant": ["src/contexts/user/useUser.tsx"], "evidence": "useUser"},
+    {"id": "s02", "type": "symbol", "lang": "en", "question": "Where is createTokenStore defined?", "relevant": ["src/lib/biometrik-api/tokenStore.ts"], "evidence": "createTokenStore"},
+    {"id": "s03", "type": "symbol", "lang": "pt", "question": "Onde está definido getApiErrorMessage?", "relevant": ["src/lib/biometrik-api/errors.ts"], "evidence": "getApiErrorMessage"},
+    {"id": "s04", "type": "symbol", "lang": "en", "question": "Where is the useRandomImage hook?", "relevant": ["src/hooks/useRandomImage.ts"], "evidence": "useRandomImage"},
+    {"id": "s05", "type": "symbol", "lang": "pt", "question": "Onde está o componente StreakFlame?", "relevant": ["src/components/StreakFlame/index.tsx"], "evidence": "StreakFlame"},
+    {"id": "s06", "type": "symbol", "lang": "en", "question": "Where is the useData hook defined?", "relevant": ["src/contexts/data/useData.tsx"], "evidence": "useData"},
+
+    {"id": "d01", "type": "docs", "lang": "pt", "question": "Posso chamar fetch direto em uma tela?", "relevant": ["docs/architecture/data-layer.md"], "evidence": "fetch"},
+    {"id": "d02", "type": "docs", "lang": "pt", "question": "Quando a versão do package.json deve mudar?", "relevant": ["AGENTS.md"], "evidence": "bump de versão"},
+    {"id": "d03", "type": "docs", "lang": "pt", "question": "De qual branch uma feature nova deve sair?", "relevant": ["AGENTS.md"], "evidence": "nasce da `develop`"},
+    {"id": "d04", "type": "docs", "lang": "pt", "question": "Como adicionar um endpoint novo na lib da API?", "relevant": ["docs/architecture/data-layer.md"], "evidence": "Endpoint novo"},
+    {"id": "d05", "type": "docs", "lang": "en", "question": "What does the i18n guard check?", "relevant": ["scripts/harness/verify-i18n.mjs", "docs/harness/features/mobile-i18n-language-switching/handoff.md"], "evidence": "i18n"},
+
+    {"id": "m01", "type": "memory", "lang": "pt", "question": "Por que o Supabase está sendo removido do app?", "relevant": ["docs/harness/features/mobile-auth-nextjs-integration/handoff.md", "docs/harness/features/mobile-logged-writes-and-supabase-removal/handoff.md", "docs/exec-plans/active/mobile-logged-writes-and-supabase-removal.md"], "evidence": "[Ss]upabase"},
+    {"id": "m02", "type": "memory", "lang": "pt", "question": "Qual project_id do Supabase foi escolhido?", "relevant": ["docs/harness/features/supabase-project-id-decision/handoff.md"], "evidence": "project_id"},
+    {"id": "m03", "type": "memory", "lang": "pt", "question": "O que falta para concluir o progresso de streak da home?", "relevant": ["docs/harness/features/home-streak-progress/handoff.md"], "evidence": "falta"},
+    {"id": "m04", "type": "memory", "lang": "en", "question": "Why are the app and webapp harnesses kept separate?", "relevant": ["docs/harness/features/harness-foundation/handoff.md"], "evidence": "webapp"},
+    {"id": "m05", "type": "memory", "lang": "pt", "question": "A prova de treino por foto já foi implementada?", "relevant": ["docs/harness/features/app-training-photo-proof/handoff.md"], "evidence": "nada implementado"},
+    {"id": "m06", "type": "memory", "lang": "pt", "question": "A rotação aleatória do fundo da abertura já chegou à develop?", "relevant": ["docs/harness/features/splash-random-background-rotation/handoff.md"], "evidence": "develop"},
+
+    {"id": "n01", "type": "no_answer", "lang": "pt", "question": "Como o app processa pagamentos com cartão de crédito?", "relevant": [], "absent": "credit.?card|cartão de crédito|stripe|checkout"},
+    {"id": "n02", "type": "no_answer", "lang": "en", "question": "How does the app register for push notifications?", "relevant": [], "absent": "expo-notifications|getExpoPushToken|registerForPush"}
+  ]
+}
