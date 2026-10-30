@@ -127,6 +127,23 @@ class OllamaEmbedder:
             data = json.loads(res.read())
         return data["embedding"]
 
+    def embed_batch(self, texts: list[str], batch_size: int = 16, timeout_s: float = 300.0) -> list[list[float]]:
+        """Send chunks in batches through `/api/embed`, which accepts a list."""
+
+        if not self._available():
+            raise RuntimeError("Ollama unavailable")
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), batch_size):
+            batch = texts[start:start + batch_size]
+            payload = json.dumps({"model": self.model, "input": batch}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{self.api_url}/api/embed", data=payload, headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout_s) as res:
+                data = json.loads(res.read())
+            vectors.extend(data["embeddings"])
+        return vectors
+
 
 JsonTransport = Callable[[dict[str, Any]], dict[str, Any]]
 

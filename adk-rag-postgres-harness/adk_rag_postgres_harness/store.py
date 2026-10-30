@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
-import json
 import os
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+# Candidates taken from each search before fusion, and the usual RRF constant.
+CANDIDATES = 50
+RRF_K = 60
+_WORD = re.compile(r"\w+")
+_CAMEL = re.compile(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+")
+_STOPWORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "by", "do", "does", "for", "from", "how", "in", "is", "it",
+    "of", "on", "or", "the", "to", "what", "where", "which", "with", "who", "why",
+    "as", "com", "como", "da", "das", "de", "do", "dos", "e", "em", "na", "nas", "no", "nos", "o", "os",
+    "onde", "para", "por", "qual", "que", "se", "um", "uma",
+})
 
 
 def _require_psycopg():
@@ -27,10 +40,55 @@ def vector_literal(vector: list[float]) -> str:
     return "[" + ",".join(format(value, ".9g") for value in vector) + "]"
 
 
+def identifier_terms(text: str) -> list[str]:
+    """Lowercase words plus the parts of each identifier: handleLogin, handle, login."""
+
+    terms: list[str] = []
+    for word in _WORD.findall(text):
+        for piece in word.split("_"):
+            if piece:
+                terms.append(piece.lower())
+                parts = _CAMEL.findall(piece)
+                if len(parts) > 1:
+                    terms.extend(part.lower() for part in parts)
+    return terms
+
+
+def search_text(path: str, content: str) -> str:
+    """The text behind the full-text index: the path, the code and split identifiers."""
+
+    return " ".join([path, content, *dict.fromkeys(identifier_terms(f"{path} {content}"))])
+
+
+def lexical_query(query: str) -> str:
+    """A `to_tsquery` that matches any term: questions rarely contain all of them."""
+
+    terms = dict.fromkeys(term for term in identifier_terms(query) if len(term) > 1 and term not in _STOPWORDS)
+    return " | ".join(f"'{term}'" for term in terms)
+
+
+@dataclass(frozen=True)
+class ChunkRow:
+    kind: str
+    name: str
+    start_line: int
+    end_line: int
+    content_hash: str
+    content: str
+
+
+@dataclass(frozen=True)
+class FileRow:
+    path: str
+    content_hash: str
+    collection: str
+    language: str
+    chunks: tuple[ChunkRow, ...]
+
+
 class PostgresStore:
-    def __init__(self, url: str | None = None, embedding_dim: int = 768) -> None:
+    def __init__(self, url: str | None = None) -> None:
         self.url = url or database_url()
-        self.embedding_dim = embedding_dim
 
     def connect(self):
         psycopg = _require_psycopg()
@@ -39,83 +97,190 @@ class PostgresStore:
     def migrate(self, migrations_dir: str | Path | None = None) -> None:
         root = Path(migrations_dir or Path(__file__).parents[1] / "migrations")
         with self.connect() as conn:
-            for migration in sorted(root.glob("*.sql")):
-                conn.execute(migration.read_text(encoding="utf-8"))
-
-    def replace_collection(self, collection: str, rows: Iterable[dict]) -> int:
-        rows = list(rows)
-        for row in rows:
-            if len(row["embedding"]) != self.embedding_dim:
-                raise ValueError(
-                    f"embedding dimension mismatch: expected {self.embedding_dim}, "
-                    f"got {len(row['embedding'])}"
-                )
-        statement = """
-            INSERT INTO rag_chunks (
-                chunk_id, collection, source, kind, name, content,
-                start_line, end_line, content_hash, metadata, embedding
-            ) VALUES (
-                %(chunk_id)s, %(collection)s, %(source)s, %(kind)s, %(name)s,
-                %(content)s, %(start_line)s, %(end_line)s, %(content_hash)s,
-                %(metadata)s::jsonb, %(embedding)s::vector
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                "name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
-            ON CONFLICT (chunk_id) DO UPDATE SET
-                content = EXCLUDED.content,
-                start_line = EXCLUDED.start_line,
-                end_line = EXCLUDED.end_line,
-                content_hash = EXCLUDED.content_hash,
-                metadata = EXCLUDED.metadata,
-                embedding = EXCLUDED.embedding,
-                updated_at = now()
-        """
+            applied = {row["name"] for row in conn.execute("SELECT name FROM schema_migrations")}
+            for migration in sorted(root.glob("*.sql")):
+                if migration.name not in applied:
+                    conn.execute(migration.read_text(encoding="utf-8"))
+                    conn.execute("INSERT INTO schema_migrations (name) VALUES (%s)", (migration.name,))
+
+    def ensure_project(self, name: str, root: str) -> int:
         with self.connect() as conn:
-            conn.execute("DELETE FROM rag_chunks WHERE collection = %s", (collection,))
+            row = conn.execute(
+                """
+                INSERT INTO projects (name, root) VALUES (%s, %s)
+                ON CONFLICT (name) DO UPDATE SET root = EXCLUDED.root, updated_at = now()
+                RETURNING id
+                """,
+                (name, root),
+            ).fetchone()
+        return row["id"]
+
+    def project(self, name: str) -> dict | None:
+        with self.connect() as conn:
+            return conn.execute("SELECT id, name, root FROM projects WHERE name = %s", (name,)).fetchone()
+
+    def file_hashes(self, project_id: int) -> dict[str, str]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT path, content_hash FROM files WHERE project_id = %s", (project_id,))
+            return {row["path"]: row["content_hash"] for row in rows}
+
+    def apply_changes(self, project_id: int, changed: Iterable[FileRow], removed: Iterable[str]) -> None:
+        """Replace changed files and their chunks in one transaction."""
+
+        changed = list(changed)
+        with self.connect() as conn:
+            paths = [*removed, *(file.path for file in changed)]
+            conn.execute("DELETE FROM files WHERE project_id = %s AND path = ANY(%s)", (project_id, paths))
             with conn.cursor() as cursor:
-                cursor.executemany(statement, [
-                    {
-                        **row,
-                        "metadata": json.dumps(row.get("metadata", {})),
-                        "embedding": vector_literal(row["embedding"]),
-                    }
-                    for row in rows
-                ])
-        return len(rows)
+                for file in changed:
+                    file_id = cursor.execute(
+                        """
+                        INSERT INTO files (project_id, path, content_hash, collection, language)
+                        VALUES (%s, %s, %s, %s, %s) RETURNING id
+                        """,
+                        (project_id, file.path, file.content_hash, file.collection, file.language),
+                    ).fetchone()["id"]
+                    cursor.executemany(
+                        """
+                        INSERT INTO chunks (
+                            project_id, file_id, collection, kind, name, start_line, end_line,
+                            content_hash, content, search_text
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        [
+                            (
+                                project_id, file_id, file.collection, chunk.kind, chunk.name,
+                                chunk.start_line, chunk.end_line, chunk.content_hash, chunk.content,
+                                search_text(file.path, chunk.content),
+                            )
+                            for chunk in file.chunks
+                        ],
+                    )
+
+    def missing_embeddings(self, project_id: int, model: str) -> list[dict]:
+        """Chunks without a vector for this model, so a changed model or a crash just resumes."""
+
+        with self.connect() as conn:
+            return list(conn.execute(
+                """
+                SELECT DISTINCT ON (c.content_hash) c.content_hash, c.content
+                FROM chunks c
+                LEFT JOIN embeddings e ON e.content_hash = c.content_hash AND e.model = %s
+                WHERE c.project_id = %s AND e.content_hash IS NULL
+                ORDER BY c.content_hash
+                """,
+                (model, project_id),
+            ))
+
+    def put_embeddings(self, model: str, items: Iterable[tuple[str, list[float]]]) -> None:
+        with self.connect() as conn, conn.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO embeddings (content_hash, model, embedding) VALUES (%s, %s, %s::vector)
+                ON CONFLICT (content_hash, model) DO NOTHING
+                """,
+                [(content_hash, model, vector_literal(vector)) for content_hash, vector in items],
+            )
+
+    @staticmethod
+    def _semantic_sql(collection: str | None) -> str:
+        scope = "AND c.collection = %(collection)s" if collection else ""
+        return f"""
+            SELECT c.id
+            FROM embeddings e
+            JOIN chunks c ON c.content_hash = e.content_hash
+            WHERE e.model = %(model)s AND c.project_id = %(project_id)s {scope}
+            ORDER BY e.embedding <=> %(vector)s::vector
+            LIMIT {CANDIDATES}
+        """
+
+    @staticmethod
+    def _prepare_vector_scan(conn) -> None:
+        # Filters run after the HNSW scan, so it keeps scanning until the limit is met.
+        conn.execute("SET LOCAL hnsw.iterative_scan = strict_order")
+        conn.execute(f"SET LOCAL hnsw.ef_search = {CANDIDATES * 2}")
 
     def search(
         self,
-        collection: str,
+        project_id: int,
         query: str,
         query_embedding: list[float],
-        top_k: int = 5,
-        filters: dict[str, str] | None = None,
+        model: str,
+        collection: str | None = None,
+        top_k: int = 8,
     ) -> list[dict]:
-        if len(query_embedding) != self.embedding_dim:
-            raise ValueError("query embedding dimension does not match the index")
-        filters = filters or {}
-        clauses = ["collection = %s"]
-        params: list[object] = [collection]
-        for key, value in sorted(filters.items()):
-            clauses.append("metadata ->> %s = %s")
-            params.extend([key, value])
-        where = " AND ".join(clauses)
+        """Reciprocal rank fusion over the vector and the full-text candidates."""
+
+        scope = "AND c.collection = %(collection)s" if collection else ""
         sql = f"""
-            WITH ranked AS (
-                SELECT *,
-                    ts_rank_cd(
-                        to_tsvector('simple', content),
-                        websearch_to_tsquery('simple', %s)
-                    ) AS lexical_score,
-                    1 - (embedding <=> %s::vector) AS semantic_score
-                FROM rag_chunks
-                WHERE {where}
+            WITH semantic AS (
+                SELECT id, row_number() OVER () AS rank
+                FROM ({self._semantic_sql(collection)}) AS nearest
+            ),
+            lexical AS (
+                SELECT id, row_number() OVER (ORDER BY text_rank DESC, id) AS rank
+                FROM (
+                    SELECT c.id, ts_rank_cd(c.search_tsv, q.tsq) AS text_rank
+                    FROM chunks c, to_tsquery('simple', %(lexical)s) AS q(tsq)
+                    WHERE c.project_id = %(project_id)s {scope} AND c.search_tsv @@ q.tsq
+                    ORDER BY text_rank DESC, c.id
+                    LIMIT {CANDIDATES}
+                ) AS matched
+            ),
+            fused AS (
+                SELECT COALESCE(s.id, l.id) AS id,
+                       s.rank AS semantic_rank,
+                       l.rank AS lexical_rank,
+                       COALESCE(1.0 / ({RRF_K} + s.rank), 0) + COALESCE(1.0 / ({RRF_K} + l.rank), 0) AS score
+                FROM semantic s
+                FULL JOIN lexical l ON l.id = s.id
             )
-            SELECT chunk_id, source, kind, name, content, start_line, end_line,
-                   lexical_score, semantic_score,
-                   (0.45 * lexical_score + 0.55 * semantic_score) AS score
-            FROM ranked
-            ORDER BY score DESC, source ASC, start_line ASC
-            LIMIT %s
+            SELECT f.path, f.content_hash AS file_hash, c.collection, c.kind, c.name,
+                   c.start_line, c.end_line, x.semantic_rank, x.lexical_rank, x.score::float AS score
+            FROM fused x
+            JOIN chunks c ON c.id = x.id
+            JOIN files f ON f.id = c.file_id
+            ORDER BY x.score DESC, f.path ASC, c.start_line ASC
+            LIMIT %(top_k)s
         """
-        params = [query, vector_literal(query_embedding), *params, top_k]
+        params = {
+            "collection": collection,
+            "lexical": lexical_query(query),
+            "model": model,
+            "project_id": project_id,
+            "top_k": top_k,
+            "vector": vector_literal(query_embedding),
+        }
         with self.connect() as conn:
+            self._prepare_vector_scan(conn)
             return list(conn.execute(sql, params).fetchall())
+
+    def semantic_plan(
+        self,
+        project_id: int,
+        query_embedding: list[float],
+        model: str,
+        collection: str | None = None,
+        force_index: bool = False,
+    ) -> str:
+        """EXPLAIN of the vector candidates; `force_index` proves the query shape can use HNSW."""
+
+        with self.connect() as conn:
+            self._prepare_vector_scan(conn)
+            if force_index:
+                conn.execute("SET LOCAL enable_seqscan = off")
+                conn.execute("SET LOCAL enable_sort = off")
+            rows = conn.execute(
+                "EXPLAIN " + self._semantic_sql(collection),
+                {
+                    "collection": collection,
+                    "model": model,
+                    "project_id": project_id,
+                    "vector": vector_literal(query_embedding),
+                },
+            )
+            return "\n".join(row["QUERY PLAN"] for row in rows)

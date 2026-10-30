@@ -1,38 +1,58 @@
 # ADK RAG PostgreSQL Harness
 
-This is the larger-project reference implementation for the course. It keeps
-the same typed decision, evidence and blocked-state boundary as
-`adk-rag-harness`, but stores chunks and embeddings in PostgreSQL with
-`pgvector`.
+A code memory on PostgreSQL and `pgvector`, built from open source parts. It
+keeps a repository indexed incrementally and searches it by meaning and by text.
 
-## Start PostgreSQL
+The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phase 1
+is done: the Postgres core, incremental sync and hybrid search. Syntax-aware
+TypeScript chunks, memory, the MCP server and the ADK wiring come next.
+
+## Start
 
 ```bash
 uv sync --extra postgres
 docker compose up -d postgres
-uv run python -m adk_rag_postgres_harness.cli migrate
+ollama pull qwen3-embedding:4b
 ```
 
 The default connection is
 `postgresql://harness:harness@localhost:5433/harness_rag`. Copy `.env.example`
-to `.env` and adjust it for another database.
+to `.env` and export it to change a setting.
 
-## Ingest a collection
-
-From the repository root, with the local RAG package available:
+## Index and search
 
 ```bash
-ollama pull nomic-embed-text
-HARNESS_EMBED_PROVIDER=ollama HARNESS_EMBED_MODEL=nomic-embed-text \
-PYTHONPATH=.:../rag-harness \
-uv run python -m adk_rag_postgres_harness.cli ingest ../docs --collection docs
+uv run python -m adk_rag_postgres_harness.cli index /path/to/repo --project my-repo
+uv run python -m adk_rag_postgres_harness.cli search "where is the login handled" --project my-repo
 ```
 
-The initial implementation replaces one collection atomically. It supports
-Python AST chunks and line chunks for documentation and configuration files.
-The SQL retrieval combines PostgreSQL full-text ranking with pgvector cosine
-similarity and applies stable ordering by score, source and line.
+Use `--collection code` or `docs` to narrow a search, and `--json` to get the
+text of each result. `tests/test_sync.py` needs the container running and creates
+a temporary database for each test; without the container it is skipped.
 
-The ADK adapter is available as `PostgresRagAdapter`. It is intentionally
-separate from the local JSON adapter so the course can show the storage tradeoff
-without changing the workflow contract.
+## How it works
+
+- **Discovery:** files come from Git and `.ragignore`, as in `rag-harness`.
+- **Incremental sync:** a file is chunked again only when its hash changes.
+  Chunks are saved before embedding, so an interrupted run resumes on the next one.
+- **Embedding cache:** `embeddings` is keyed by content hash and model. Identical
+  text is embedded once, vectors of several models coexist, and returning to a
+  model recomputes nothing.
+- **Hybrid search:** reciprocal rank fusion over the top 50 from HNSW and the top
+  50 from full text. Identifiers are split, so `login` finds `handleLogin`.
+- **Results:** the database gives the path and lines, and the text is read from
+  disk. `stale` marks a file that changed after indexing, because its lines may
+  have moved.
+
+## Embedding model
+
+The default is `qwen3-embedding:4b` on Ollama: local, free and open. The column
+holds 1,024 dimensions, because a pgvector HNSW index accepts at most 2,000, so
+longer vectors are cut and normalized again. A model with fewer dimensions, such
+as `nomic-embed-text` (768), fails with a clear error instead of being padded.
+
+Vectors from different models cannot be converted. To change models, set
+`HARNESS_EMBED_MODEL` and run `index` again: only the embeddings are computed.
+
+`PostgresRagAdapter` keeps the ADK retrieval contract, but `adk web` does not
+select it yet.
