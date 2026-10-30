@@ -126,6 +126,21 @@ HARNESS_RAG_PROVIDER=postgres HARNESS_RAG_PROJECT=my-repo uv run adk web
   used by `index`, because other vectors do not exist in the database.
 - **`memory`:** it always searches by meaning and by text, whatever strategy was chosen.
 
+## What gets recorded
+
+Searches from the CLI, MCP and `adk web` are saved in the local database, to build
+evaluation questions from real use: the question, the tool, the collection, the
+strategy, the files returned and the time taken. Nothing leaves your machine.
+
+```bash
+uv run python -m adk_rag_postgres_harness.cli queries --project my-repo
+uv run python -m adk_rag_postgres_harness.cli queries --project my-repo --json > queries.json
+```
+
+A question that looks like a credential is saved masked, using the same patterns as
+`remember`. Questions Jev answers without searching are not recorded. The log is lost
+with the database, so export it first. `HARNESS_QUERY_LOG=off` turns it off.
+
 ## How it works
 
 - **Discovery:** files come from Git and `.ragignore`, as in `rag-harness`.

@@ -140,6 +140,16 @@ class McpToolTests(unittest.TestCase):
         self.assertNotIn("src/cart.ts", {hit["path"] for hit in hits})
         self.assertTrue(self._call("read_lines", path="src/cart.ts").isError)
 
+    def test_tool_calls_are_recorded(self):
+        self._ok("search_code", query="addToCart", collection="code")
+        self._ok("find_symbol", name="addToCart")
+        self._ok("recall", query="carts")
+        rows = self.store.recent_queries("shop")
+        self.assertEqual([row["tool"] for row in rows], ["recall", "find_symbol", "search_code"])
+        self.assertEqual({row["entry"] for row in rows}, {"mcp"})
+        self.assertEqual(rows[2]["collection"], "code")
+        self.assertIn("src/cart.ts", rows[2]["results"])
+
     def test_remember_and_recall_share_the_versioned_file(self):
         saved = self._ok("remember", text="Carts are saved on the server.", source="PR 7", kind="decision")
         self.assertEqual(saved["file"], "docs/harness/memories.jsonl")

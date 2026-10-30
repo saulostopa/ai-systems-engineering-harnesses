@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import asdict
 from functools import wraps
 from typing import Literal
@@ -11,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
 from .memory import MemoryRefused, memory_file, recall as recall_memories, remember as remember_memory
+from .query_log import log_query
 from .retrieval import find_symbol as find_definitions, read_file, search_code as search_hits, where_used
 from .store import PostgresStore
 
@@ -56,7 +58,9 @@ def build_server(project: str, embedder=None, store: PostgresStore | None = None
     def search_code(query: str, collection: Literal["code", "docs"] | None = None, top_k: int = 8) -> dict:
         """Search the repository by meaning. Pass `collection` when you know it: `code` or `docs` also match by text. A name in code style finds its definition first. Returns path, lines and text read from disk."""
 
+        started = time.perf_counter()
         hits = search_hits(query, project, collection, _top_k(top_k), embedder=embedder, store=store)
+        log_query(store, project, "mcp", "search_code", query, started, [hit.path for hit in hits], collection)
         return {"hits": [asdict(hit) for hit in hits]}
 
     @server.tool(structured_output=False, meta=ALWAYS_LOAD)
@@ -64,10 +68,10 @@ def build_server(project: str, embedder=None, store: PostgresStore | None = None
     def find_symbol(name: str) -> dict:
         """Where a function, component or type is defined and which files import it. Also accepts a file path, for its importers."""
 
-        return {
-            "definitions": find_definitions(name, project, store=store),
-            "importers": where_used(name, project, store=store),
-        }
+        started = time.perf_counter()
+        definitions = find_definitions(name, project, store=store)
+        log_query(store, project, "mcp", "find_symbol", name, started, [row["path"] for row in definitions])
+        return {"definitions": definitions, "importers": where_used(name, project, store=store)}
 
     @server.tool(structured_output=False, meta=ALWAYS_LOAD)
     @_guarded
@@ -107,7 +111,9 @@ def build_server(project: str, embedder=None, store: PostgresStore | None = None
     ) -> dict:
         """Search saved memories and the feature progress and handoff logs. Replaced decisions stay hidden unless asked for."""
 
+        started = time.perf_counter()
         hits = recall_memories(query, project, kind, _top_k(top_k), include_superseded, embedder=embedder, store=store)
+        log_query(store, project, "mcp", "recall", query, started, [hit.source for hit in hits], "memory")
         return {"hits": [asdict(hit) for hit in hits]}
 
     return server

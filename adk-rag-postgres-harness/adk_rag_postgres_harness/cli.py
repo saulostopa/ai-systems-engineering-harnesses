@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from dataclasses import asdict
 
 from .store import PostgresStore
@@ -41,6 +42,11 @@ def main() -> None:
     read_parser.add_argument("--start", type=int, default=1)
     read_parser.add_argument("--end", type=int)
 
+    queries_parser = sub.add_parser("queries", help="the questions recorded locally, newest first")
+    queries_parser.add_argument("--project", required=True)
+    queries_parser.add_argument("--limit", type=int, default=50)
+    queries_parser.add_argument("--json", action="store_true")
+
     mcp_parser = sub.add_parser("mcp", help="serve the same tools to an agent over MCP (stdio)")
     mcp_parser.add_argument("--project", required=True)
 
@@ -60,6 +66,8 @@ def main() -> None:
     recall_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args()
+    from .query_log import log_query
+
     if args.command == "migrate":
         PostgresStore().migrate()
         print("migrations applied")
@@ -84,6 +92,13 @@ def main() -> None:
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
         print(result.text)
+    elif args.command == "queries":
+        rows = PostgresStore().recent_queries(args.project, args.limit)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2, default=str))
+            return
+        for row in rows:
+            print(f"{row['created_at']:%Y-%m-%d %H:%M}  {row['entry']}  {row['tool']}  {row['query'][:80]}")
     elif args.command == "mcp":
         from .mcp_server import build_server
 
@@ -99,7 +114,9 @@ def main() -> None:
     elif args.command == "recall":
         from .memory import recall
 
+        started = time.perf_counter()
         hits = recall(args.query, args.project, args.kind, args.top_k, args.include_superseded)
+        log_query(PostgresStore(), args.project, "cli", "recall", args.query, started, [hit.source for hit in hits], "memory")
         if args.json:
             print(json.dumps([asdict(hit) for hit in hits], ensure_ascii=False, indent=2))
             return
@@ -122,7 +139,9 @@ def main() -> None:
     else:
         from .retrieval import search_code
 
+        started = time.perf_counter()
         hits = search_code(args.query, args.project, args.collection, args.top_k)
+        log_query(PostgresStore(), args.project, "cli", "search", args.query, started, [hit.path for hit in hits], args.collection)
         if args.json:
             print(json.dumps([asdict(hit) for hit in hits], ensure_ascii=False, indent=2))
             return

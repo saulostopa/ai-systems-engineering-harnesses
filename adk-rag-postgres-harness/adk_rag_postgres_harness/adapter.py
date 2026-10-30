@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 from .memory import recall
+from .query_log import log_query
 from .retrieval import search_code
 from .store import PostgresStore
 
@@ -69,7 +71,12 @@ class PostgresRagAdapter:
             raise ValueError(f"unknown RAG collection: {request.collection}")
         if request.strategy not in STRATEGIES:
             raise ValueError(f"unknown retrieval strategy: {request.strategy}")
+        started = time.perf_counter()
         evidence = self._memory(request) if request.collection == "memory" else self._code_or_docs(request)
+        log_query(
+            self.store, self.project, "adk", "retrieve", request.query, started,
+            [chunk.source for chunk in evidence], request.collection, request.strategy,
+        )
         return self._RetrievalResponse(
             request=request,
             chunks=evidence,

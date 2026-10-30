@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -255,6 +256,39 @@ class PostgresStore:
                 ORDER BY t.content_hash
                 """,
                 {"model": model, "project_id": project_id},
+            ))
+
+    def add_query(
+        self,
+        project: str,
+        entry: str,
+        tool: str,
+        query: str,
+        collection: str | None,
+        strategy: str | None,
+        results: list[str],
+        latency_ms: int,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO queries (project_id, entry, tool, query, collection, strategy, results, latency_ms)
+                SELECT id, %s, %s, %s, %s, %s, %s::jsonb, %s FROM projects WHERE name = %s
+                """,
+                (entry, tool, query, collection, strategy, json.dumps(results), latency_ms, project),
+            )
+
+    def recent_queries(self, project: str, limit: int = 50) -> list[dict]:
+        with self.connect() as conn:
+            return list(conn.execute(
+                """
+                SELECT q.created_at, q.entry, q.tool, q.query, q.collection, q.strategy, q.results, q.latency_ms
+                FROM queries q JOIN projects p ON p.id = q.project_id
+                WHERE p.name = %s
+                ORDER BY q.created_at DESC, q.id DESC
+                LIMIT %s
+                """,
+                (project, limit),
             ))
 
     @contextlib.contextmanager

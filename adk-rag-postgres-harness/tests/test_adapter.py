@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest import mock
 from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).parents[1]
@@ -19,6 +21,8 @@ from adk_rag_postgres_harness.adapter import COLLECTIONS, PostgresRagAdapter
 from adk_rag_postgres_harness.embeddings import EMBED_DIM, embed_query, embedder_id
 from adk_rag_postgres_harness.ingest import sync
 from adk_rag_postgres_harness.memory import remember
+from adk_rag_postgres_harness.query_log import MASKED_QUERY
+from adk_rag_postgres_harness.retrieval import search_code
 from adk_rag_postgres_harness.store import PostgresStore, database_url
 from rag_harness.embeddings import NGramEmbedder
 
@@ -125,6 +129,31 @@ class PostgresWorkflowTests(unittest.TestCase):
         sources = [chunk.source for chunk in self._run("memory", query="coupons server").chunks]
         self.assertIn(f"{memory.id} (PR 3)", sources)
         self.assertIn("docs/harness/features/cart/progress.md", sources)
+
+    def test_retrievals_are_recorded_with_the_choices_of_jev(self):
+        self._run("code", "keyword")
+        row = self.store.recent_queries("shop")[0]
+        self.assertEqual((row["entry"], row["collection"], row["strategy"]), ("adk", "code", "keyword"))
+        self.assertIn("src/cart.ts", row["results"])
+
+    def test_a_question_with_a_credential_is_masked(self):
+        secret = "sk-or-v1-abcdef0123456789abcdef"
+        self._run("code", "keyword", query=f"addToCart {secret}")
+        row = self.store.recent_queries("shop")[0]
+        self.assertEqual(row["query"], MASKED_QUERY)
+
+    def test_the_log_can_be_turned_off(self):
+        with mock.patch.dict(os.environ, {"HARNESS_QUERY_LOG": "off"}):
+            self._run("code", "keyword")
+        self.assertEqual(self.store.recent_queries("shop"), [])
+
+    def test_a_search_survives_a_log_failure(self):
+        with mock.patch.object(self.store, "add_query", side_effect=RuntimeError("no table")):
+            self.assertEqual(self._run("code", "keyword").status, WorkflowStatus.RETRIEVED)
+
+    def test_the_search_functions_do_not_record(self):
+        search_code("addToCart", "shop", "code", 5, self.embedder, self.store)
+        self.assertEqual(self.store.recent_queries("shop"), [])
 
     def test_a_changed_file_is_marked_stale(self):
         (self.repo / "src/cart.ts").write_text("// moved\nexport function addToCart(item) {\n  return item;\n}\n")
