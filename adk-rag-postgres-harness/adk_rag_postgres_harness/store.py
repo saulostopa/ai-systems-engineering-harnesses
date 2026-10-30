@@ -424,20 +424,21 @@ class PostgresStore:
         self,
         project_id: int,
         query: str,
-        query_embedding: list[float],
+        query_embedding: list[float] | None,
         model: str,
         collection: str | None = None,
         top_k: int = 8,
+        strategy: str = "hybrid",
     ) -> list[dict]:
-        """Reciprocal rank fusion over the vector and the full-text candidates."""
+        """Reciprocal rank fusion over the candidates of the chosen strategy."""
 
         scope = "AND c.collection = %(collection)s" if collection else ""
-        sql = f"""
-            WITH semantic AS (
+        no_rows = "SELECT NULL::bigint AS id, NULL::bigint AS rank WHERE false"
+        semantic = no_rows if strategy == "keyword" else f"""
                 SELECT id, row_number() OVER () AS rank
                 FROM ({self._semantic_sql(collection)}) AS nearest
-            ),
-            lexical AS (
+        """
+        lexical = no_rows if strategy == "semantic" else f"""
                 SELECT id, row_number() OVER (ORDER BY text_rank DESC, id) AS rank
                 FROM (
                     SELECT c.id, ts_rank_cd(c.search_tsv, q.tsq) AS text_rank
@@ -446,7 +447,10 @@ class PostgresStore:
                     ORDER BY text_rank DESC, c.id
                     LIMIT {CANDIDATES}
                 ) AS matched
-            ),
+        """
+        sql = f"""
+            WITH semantic AS ({semantic}),
+            lexical AS ({lexical}),
             fused AS (
                 SELECT COALESCE(s.id, l.id) AS id,
                        s.rank AS semantic_rank,
@@ -469,7 +473,7 @@ class PostgresStore:
             "model": model,
             "project_id": project_id,
             "top_k": top_k,
-            "vector": vector_literal(query_embedding),
+            "vector": vector_literal(query_embedding) if query_embedding is not None else None,
         }
         with self.connect() as conn:
             self._prepare_vector_scan(conn)

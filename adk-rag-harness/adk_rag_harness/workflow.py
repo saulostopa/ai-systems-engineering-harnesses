@@ -54,6 +54,7 @@ COLLECTION_HINTS = {
     "docs": "documentation, plans, policies and configuration",
     "code": "source code such as functions, components and modules",
     "area": "business-area knowledge",
+    "memory": "earlier decisions, conventions, and feature progress and handoff logs",
 }
 
 
@@ -138,6 +139,7 @@ class AdkRagWorkflow:
                         score=score_val,
                         start_line=chunk.start_line,
                         end_line=chunk.end_line,
+                        stale=chunk.stale,
                     )
                 )
             except Exception:

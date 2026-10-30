@@ -71,7 +71,8 @@ class AdkRuntimeAdapter:
                 "as authoritative. If status is direct, answer without citing "
                 "sources. If status is clarify or blocked, ask for clarification "
                 "or explain that evidence is insufficient. When status is "
-                "retrieved, cite the returned source values. If action_gate is "
+                "retrieved, cite the returned source values, and say the lines "
+                "may have moved when an evidence item is stale. If action_gate is "
                 "confirm or human_review, say the answer needs human confirmation."
             ),
             tools=[self.run_workflow],
@@ -109,6 +110,7 @@ class AdkRuntimeAdapter:
                     "score": chunk.score,
                     "start_line": chunk.start_line,
                     "end_line": chunk.end_line,
+                    "stale": chunk.stale,
                 }
                 for chunk in result.chunks
             ],

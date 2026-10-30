@@ -125,11 +125,38 @@ def _build_workflow() -> AdkRagWorkflow:
                 break
         rag = RagHarnessAdapter(str(repository_root / "rag-harness"), indexes)
         collections = tuple(indexes)
+    elif RAG_PROVIDER == "postgres":
+        rag, collections = _postgres_rag(Path(__file__).parents[2])
     else:
         raise RuntimeError(
-            f"Unsupported HARNESS_RAG_PROVIDER={RAG_PROVIDER!r}; use index or demo"
+            f"Unsupported HARNESS_RAG_PROVIDER={RAG_PROVIDER!r}; use postgres, index or demo"
         )
     return AdkRagWorkflow(decisions, rag, enable_guardrail=GUARDRAIL, collections=collections)
+
+
+def _postgres_rag(repository_root: Path):
+    """A wrong setting stops the app; a database that is down only blocks each retrieval."""
+
+    project = os.getenv("HARNESS_RAG_PROJECT")
+    if not project:
+        raise RuntimeError("HARNESS_RAG_PROVIDER=postgres needs HARNESS_RAG_PROJECT, the name given to `index`")
+    try:
+        import psycopg
+    except ImportError as exc:
+        raise RuntimeError("PostgreSQL support requires the optional dependency: uv sync --extra postgres") from exc
+    sys.path.insert(0, str(repository_root / "adk-rag-postgres-harness"))
+    from adk_rag_postgres_harness.adapter import COLLECTIONS, PostgresRagAdapter
+
+    rag = PostgresRagAdapter(project)
+    try:
+        found = rag.store.project(project)
+    except psycopg.Error:
+        return rag, COLLECTIONS
+    if found is None:
+        raise RuntimeError(f"unknown project {project!r}; run `index` in adk-rag-postgres-harness first")
+    # Ledger lines belong to the repository that was indexed.
+    os.environ.setdefault("HARNESS_PROJECT_ROOT", found["root"])
+    return rag, COLLECTIONS
 
 
 def _rag_collection_indexes(repository_root: Path) -> dict[str, str]:

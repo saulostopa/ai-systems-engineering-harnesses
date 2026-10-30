@@ -123,15 +123,18 @@ def search_code(
     top_k: int = 8,
     embedder=None,
     store: PostgresStore | None = None,
+    strategy: str = "hybrid",
 ) -> list[Hit]:
     store = store or PostgresStore()
-    embedder = embedder or memory_embedder()
     found = store.project(project)
     if found is None:
         raise ValueError(f"unknown project {project!r}; index it first")
-    rows = store.search(
-        found["id"], query, embed_query(embedder, query), embedder_id(embedder), collection, top_k
-    )
+    # Keyword search needs no model, so it also works without Ollama.
+    vector, model = None, ""
+    if strategy != "keyword":
+        embedder = embedder or memory_embedder()
+        vector, model = embed_query(embedder, query), embedder_id(embedder)
+    rows = store.search(found["id"], query, vector, model, collection, top_k, strategy)
     hits: list[Hit] = []
     for row in rows:
         full = safe_file(found["root"], row["path"])

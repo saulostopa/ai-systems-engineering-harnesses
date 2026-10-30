@@ -5,8 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .memory import recall
 from .retrieval import search_code
 from .store import PostgresStore
+
+COLLECTIONS = ("code", "docs", "memory")
+STRATEGIES = ("hybrid", "semantic", "keyword")
 
 
 class PostgresRagAdapter:
@@ -29,13 +33,29 @@ class PostgresRagAdapter:
         self.store = store or PostgresStore()
         self.embedder = embedder
 
-    def retrieve(self, request):
+    def _code_or_docs(self, request):
         hits = search_code(
-            request.query, self.project, request.collection, request.top_k, self.embedder, self.store
+            request.query, self.project, request.collection, request.top_k, self.embedder, self.store, request.strategy
         )
-        evidence = tuple(
+        return tuple(
             self._EvidenceChunk(
                 source=hit.path,
+                text=hit.text,
+                score=hit.score,
+                start_line=hit.start_line,
+                end_line=hit.end_line,
+                stale=hit.stale,
+            )
+            for hit in hits
+        )
+
+    def _memory(self, request):
+        """Saved decisions and feature logs; they are always searched by both meaning and text."""
+
+        hits = recall(request.query, self.project, top_k=request.top_k, embedder=self.embedder, store=self.store)
+        return tuple(
+            self._EvidenceChunk(
+                source=f"{hit.memory_id} ({hit.source})" if hit.origin == "memory" else hit.source,
                 text=hit.text,
                 score=hit.score,
                 start_line=hit.start_line,
@@ -43,6 +63,13 @@ class PostgresRagAdapter:
             )
             for hit in hits
         )
+
+    def retrieve(self, request):
+        if request.collection not in COLLECTIONS:
+            raise ValueError(f"unknown RAG collection: {request.collection}")
+        if request.strategy not in STRATEGIES:
+            raise ValueError(f"unknown retrieval strategy: {request.strategy}")
+        evidence = self._memory(request) if request.collection == "memory" else self._code_or_docs(request)
         return self._RetrievalResponse(
             request=request,
             chunks=evidence,

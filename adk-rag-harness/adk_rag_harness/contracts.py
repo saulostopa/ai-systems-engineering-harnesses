@@ -99,6 +99,8 @@ class EvidenceChunk:
     score: float
     start_line: int | None = None
     end_line: int | None = None
+    # The file changed after indexing, so the lines may have moved.
+    stale: bool = False
 
 
 @dataclass(frozen=True)

@@ -4,8 +4,8 @@ A code memory on PostgreSQL and `pgvector`, built from open source parts. It
 keeps a repository indexed incrementally and searches it by meaning and by text.
 
 The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases 1
-to 4 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
-chunks, symbols, imports, memory and the MCP server. The ADK wiring comes next.
+to 5 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
+chunks, symbols, imports, memory, the MCP server and the ADK wiring.
 
 ## Start
 
@@ -96,6 +96,28 @@ Code has been tested.
 - **Worktrees:** the server reads the folder that was indexed, not the agent's
   worktree.
 
+## With Jev in ADK
+
+The same index serves `adk web`, where Jev decides whether to search, which collection
+to use (`code`, `docs` or `memory`) and which strategy (`hybrid`, `semantic` or
+`keyword`). This path only reads: `remember` stays in the CLI and MCP.
+
+```bash
+cd ../adk-rag-harness
+uv sync --extra adk --extra openrouter --extra postgres
+HARNESS_RAG_PROVIDER=postgres HARNESS_RAG_PROJECT=my-repo uv run adk web
+```
+
+- **Cost:** Jev and the conversation model are billed through OpenRouter by default.
+  The search itself stays local.
+- **Failures:** with the database or the embedding model down, a retrieval ends in
+  `blocked` with `human_review`, and so does a search with no evidence. `keyword` needs
+  no model, so it still works without Ollama. A missing or unknown project stops the
+  app when it starts.
+- **Embedding model:** keep the same `HARNESS_EMBED_PROVIDER` and `HARNESS_EMBED_MODEL`
+  used by `index`, because other vectors do not exist in the database.
+- **`memory`:** it always searches by meaning and by text, whatever strategy was chosen.
+
 ## How it works
 
 - **Discovery:** files come from Git and `.ragignore`, as in `rag-harness`.
@@ -131,6 +153,3 @@ as `nomic-embed-text` (768), fails with a clear error instead of being padded.
 
 Vectors from different models cannot be converted. To change models, set
 `HARNESS_EMBED_MODEL` and run `index` again: only the embeddings are computed.
-
-`PostgresRagAdapter` keeps the ADK retrieval contract, but `adk web` does not
-select it yet.

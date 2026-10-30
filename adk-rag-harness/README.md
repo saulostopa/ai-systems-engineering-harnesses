@@ -140,8 +140,9 @@ own indexes.
 | Decisions | `HARNESS_DECISION_PROVIDER` = `openrouter` \| `ollama` \| `typesafe` \| `demo` | `HARNESS_DECISION_MODEL`: `typesafe/jev-router` · `qwen2.5:14b` · `jev-latest` |
 | Embeddings | `HARNESS_EMBED_PROVIDER` = `openrouter` \| `ollama` \| `ngram` | `HARNESS_EMBED_MODEL`: `voyageai/voyage-code-4` · `nomic-embed-text` |
 
-Retrieval uses `HARNESS_RAG_PROVIDER` (`demo` or `index`) and
-`HARNESS_RAG_{DOCS,CODE,AREA}_INDEX`; `HARNESS_GUARDRAIL=on` enables the
+Retrieval uses `HARNESS_RAG_PROVIDER` (`demo`, `index` or `postgres`), with
+`HARNESS_RAG_{DOCS,CODE,AREA}_INDEX` for `index` and `HARNESS_RAG_PROJECT` for
+`postgres` (see `adk-rag-postgres-harness/README.md`); `HARNESS_GUARDRAIL=on` enables the
 injection filter. Endpoints are `OPENROUTER_BASE_URL` and `OLLAMA_BASE_URL`;
 keys stay in `OPENROUTER_API_KEY` (or `~/.local/share/opencode/auth.json`) and
 `TYPESAFE_API_KEY`, never in `.env`.
@@ -161,6 +162,9 @@ HARNESS_RAG_PROVIDER=demo uv run adk web
 
 # Real course-document index
 HARNESS_RAG_PROVIDER=index uv run adk web
+
+# A repository indexed by adk-rag-postgres-harness (uv sync --extra postgres)
+HARNESS_RAG_PROVIDER=postgres HARNESS_RAG_PROJECT=my-repo uv run adk web
 ```
 
 Create one index per collection for the target repository before using
