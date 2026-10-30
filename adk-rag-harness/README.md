@@ -76,6 +76,37 @@ request
 Without steps 2 and 3 the app runs on demo evidence, which is enough to try
 the decision flow. The sections below detail each piece.
 
+### Shortcut from the target repository
+
+Steps 2 to 4 can live in the target repository as one command, so nobody
+edits `.env` when switching projects: variables set in the shell take
+precedence over `adk-rag-harness/.env` (ADK keeps explicit variables when it
+loads the file). A minimal launcher, saved for example as
+`scripts/assistant.sh` in the target repository:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+HARNESSES_DIR="${HARNESSES_DIR:-$HOME/Sites/harness/harnesses}"
+export RAG_EMBEDDER=openrouter OPENROUTER_EMBED_MODEL=voyageai/voyage-code-4
+if [ "${1:-}" = index ]; then
+  for p in docs code; do
+    PYTHONPATH="$HARNESSES_DIR/rag-harness" python3 -m rag_harness index "$REPO" --profile "$p"
+  done
+  exit 0
+fi
+export HARNESS_PROJECT_ROOT="$REPO" HARNESS_RAG_PROVIDER=rag-harness \
+  HARNESS_RAG_DOCS_INDEX="$REPO/.rag_index/docs" HARNESS_RAG_CODE_INDEX="$REPO/.rag_index/code"
+exec uv run --directory "$HARNESSES_DIR/adk-rag-harness" adk web --port "${PORT:-8000}"
+```
+
+Expose it as a project command, for example `"assistant": "bash
+scripts/assistant.sh"` in `package.json`, then run `npm run assistant -- index`
+once and `npm run assistant` to open the app. The Biometrik App uses this
+pattern as `npm run assistente` (`scripts/harness/assistente.sh`), with
+checks for the clone, `uv` and the indexes.
+
 The dependency-free Jev adapter targets TypeSafe's `/v1/systemone` contract and
 accepts an injected transport for offline tests. `TypeSafeSdkDecisionProvider`
 can use the official `typesafe-sdk` package when the optional
