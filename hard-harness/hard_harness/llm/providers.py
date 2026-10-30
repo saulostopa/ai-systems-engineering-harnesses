@@ -7,7 +7,8 @@ The hard-harness agents receive an injectable provider
   - OllamaProvider:    local /v1/chat/completions endpoint.
   - StubProvider:      deterministic, for offline tests/examples.
   - make_provider():   environment-based selection, with NO network surprise:
-        1. OPENROUTER_API_KEY defined  -> OpenRouter
+        1. OpenRouter key found         -> OpenRouter (OPENROUTER_API_KEY, else
+                                           the local OpenCode auth.json)
         2. OLLAMA_BASE_URL defined      -> Ollama (short probe)
         3. otherwise                   -> Stub (with a clear warning)
 
@@ -24,6 +25,7 @@ import os
 import time
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..usage import record
@@ -32,6 +34,28 @@ OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
 OLLAMA_BASE = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.2"
+DEFAULT_AUTH_FILE = "~/.local/share/opencode/auth.json"
+
+
+def openrouter_auth_file() -> Path:
+    return Path(os.environ.get("OPENROUTER_AUTH_FILE", DEFAULT_AUTH_FILE)).expanduser()
+
+
+def load_openrouter_api_key() -> str:
+    """Load an OpenRouter key from env or the local OpenCode auth file."""
+
+    explicit = os.environ.get("OPENROUTER_API_KEY", "")
+    if explicit:
+        return explicit
+    try:
+        data = json.loads(openrouter_auth_file().read_text())
+    except (OSError, json.JSONDecodeError):
+        return ""
+    for provider in ("openrouter", "opencode"):
+        value = data.get(provider) if isinstance(data, dict) else None
+        if isinstance(value, dict) and isinstance(value.get("key"), str):
+            return value["key"]
+    return ""
 
 
 @dataclass
@@ -114,9 +138,9 @@ class OpenRouterProvider(LLMProvider):
 
     def __init__(self, api_key: str | None = None, model: str = OPENROUTER_MODEL, base_url: str = OPENROUTER_BASE,
                  max_tokens: int = 2048, temperature: float = 0.2, timeout_s: float = 120.0) -> None:
-        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
+        self.api_key = api_key or load_openrouter_api_key()
         if not self.api_key:
-            raise LLMError("OPENROUTER_API_KEY not set (env or argument)")
+            raise LLMError(f"OPENROUTER_API_KEY not set (env, argument or {DEFAULT_AUTH_FILE})")
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.max_tokens = max_tokens
@@ -210,15 +234,19 @@ class StubProvider(LLMProvider):
 def make_provider(prefer_ollama: bool = False) -> LLMProvider:
     """Environment-based selection — no network surprise (course lesson: decide by evidence).
 
-    1. OPENROUTER_API_KEY defined -> OpenRouter (this session's default).
+    1. OpenRouter key found -> OpenRouter (this session's default). The key
+       comes from OPENROUTER_API_KEY, else from the local OpenCode auth.json
+       (OPENROUTER_AUTH_FILE); the file case is announced, since it bills.
     2. OLLAMA_BASE_URL defined (or prefer_ollama) and Ollama responds -> Ollama.
     3. otherwise -> Stub with a clear warning.
     """
     if "OLLAMA_API_URL" in os.environ:
         raise LLMError("OLLAMA_API_URL was renamed to OLLAMA_BASE_URL")
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key = load_openrouter_api_key()
     ollama_url = os.environ.get("OLLAMA_BASE_URL", "")
     if api_key:
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            print(f"[llm] using OpenRouter with the key from {openrouter_auth_file()}")
         try:
             return OpenRouterProvider(api_key=api_key)
         except LLMError as exc:
@@ -229,5 +257,5 @@ def make_provider(prefer_ollama: bool = False) -> LLMProvider:
             return OllamaProvider(base_url=base)
         print(f"[llm] warning: Ollama ({base}) did not respond — using stub")
     if not api_key and not ollama_url and not prefer_ollama:
-        print("[llm] warning: no provider configured (OPENROUTER_API_KEY or OLLAMA_BASE_URL) — using deterministic stub")
+        print("[llm] warning: no provider configured (OPENROUTER_API_KEY, auth.json or OLLAMA_BASE_URL) — using deterministic stub")
     return StubProvider()

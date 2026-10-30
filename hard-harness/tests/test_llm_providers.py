@@ -23,6 +23,8 @@ from typing import Any
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Tests never write to the real usage ledger unless a test enables it.
 os.environ.setdefault("HARNESS_USAGE", "0")
+# Never pick up the developer's real OpenRouter key (that would bill).
+os.environ["OPENROUTER_AUTH_FILE"] = os.devnull
 
 from hard_harness.agents import PlannerAgent, ReviewerAgent  # noqa: E402
 from hard_harness.core.schemas import NodeInput, WorkflowState, WorkflowStatus  # noqa: E402
@@ -31,6 +33,7 @@ from hard_harness.llm.providers import (  # noqa: E402
     OllamaProvider,
     OpenRouterProvider,
     StubProvider,
+    load_openrouter_api_key,
     make_provider,
 )
 
@@ -247,6 +250,41 @@ def test_make_provider_rejeita_ollama_api_url_antigo():
         assert "OLLAMA_BASE_URL" in str(exc)
     finally:
         os.environ.pop("OLLAMA_API_URL", None)
+
+
+def _with_auth_file(content: str, fn):
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        fh.write(content)
+    previous = os.environ.get("OPENROUTER_AUTH_FILE")
+    os.environ["OPENROUTER_AUTH_FILE"] = fh.name
+    try:
+        return fn()
+    finally:
+        os.environ["OPENROUTER_AUTH_FILE"] = previous or os.devnull
+        os.unlink(fh.name)
+
+
+def test_chave_do_auth_json_seleciona_openrouter():
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    provider = _with_auth_file(json.dumps({"openrouter": {"type": "api", "key": "file-key"}}), make_provider)
+    assert provider.name == "openrouter"
+    assert provider.api_key == "file-key"
+
+
+def test_env_vence_o_auth_json():
+    os.environ["OPENROUTER_API_KEY"] = "env-key"
+    try:
+        key = _with_auth_file(json.dumps({"openrouter": {"key": "file-key"}}), load_openrouter_api_key)
+        assert key == "env-key"
+    finally:
+        os.environ.pop("OPENROUTER_API_KEY", None)
+
+
+def test_auth_json_invalido_cai_no_stub():
+    os.environ.pop("OPENROUTER_API_KEY", None)
+    os.environ.pop("OLLAMA_BASE_URL", None)
+    provider = _with_auth_file("not json", make_provider)
+    assert provider.name == "stub"
 
 if __name__ == "__main__":
     import traceback

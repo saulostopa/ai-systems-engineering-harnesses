@@ -21,6 +21,8 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Tests never write to the real usage ledger unless a test enables it.
 os.environ.setdefault("HARNESS_USAGE", "0")
+# Never pick up the developer's real OpenRouter key (that would bill).
+os.environ["OPENROUTER_AUTH_FILE"] = os.devnull
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 
 from hard_harness.core import Limits, Node, NodeInput, NodeKind, NodeOutput, Runner, WorkflowGraph  # noqa: E402
