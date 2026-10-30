@@ -43,7 +43,7 @@
           "embedding",
           "postgres"
         ],
-        "note": "O agente decide sozinho e usa o mesmo núcleo local, sem as decisões do Jev."
+        "note": "O agente decide, busca no núcleo local e escreve a resposta. Nada passa pelo OpenRouter."
       }
     ]
   },
@@ -105,7 +105,7 @@
       "type": "cloud",
       "label": "Pergunta",
       "sublabel": "OpenRouter · jev-router",
-      "width": 176
+      "width": 175
     },
     {
       "id": "guardrail",
@@ -114,7 +114,7 @@
       "type": "security",
       "label": "Guardrail",
       "sublabel": "is_safe? · opcional",
-      "width": 176
+      "width": 175
     },
     {
       "id": "precisa_busca",
@@ -123,7 +123,7 @@
       "type": "backend",
       "label": "Buscar?",
       "sublabel": "needs_retrieval",
-      "width": 176
+      "width": 175
     },
     {
       "id": "colecao_estrategia",
@@ -132,16 +132,16 @@
       "type": "backend",
       "label": "Rota da busca",
       "sublabel": "coleção e estratégia",
-      "width": 176
+      "width": 175
     },
     {
       "id": "sem_jev",
       "lane": "conversa",
       "col": 4,
       "type": "frontend",
-      "label": "Claude Code",
+      "label": "Claude / Codex / Agy",
       "sublabel": "sem Jev · MCP ou CLI",
-      "width": 176
+      "width": 175
     },
     {
       "id": "embedding",
@@ -150,7 +150,7 @@
       "type": "backend",
       "label": "Embedding",
       "sublabel": "Ollama · Qwen3",
-      "width": 176
+      "width": 175
     },
     {
       "id": "postgres",
@@ -159,7 +159,7 @@
       "type": "database",
       "label": "Postgres",
       "sublabel": "pgvector + disco",
-      "width": 176
+      "width": 175
     },
     {
       "id": "resposta",
@@ -168,7 +168,7 @@
       "type": "cloud",
       "label": "Resposta",
       "sublabel": "OpenRouter · cita fontes",
-      "width": 176
+      "width": 175
     },
     {
       "id": "saida_inseguro",
@@ -177,7 +177,7 @@
       "type": "security",
       "label": "blocked",
       "sublabel": "entrada insegura",
-      "width": 176
+      "width": 175
     },
     {
       "id": "saida_direct",
@@ -186,7 +186,7 @@
       "type": "messagebus",
       "label": "direct",
       "sublabel": "ou clarify · sem busca",
-      "width": 176
+      "width": 175
     },
     {
       "id": "saida_clarify",
@@ -195,7 +195,7 @@
       "type": "messagebus",
       "label": "clarify",
       "sublabel": "confiança < 0,60",
-      "width": 176
+      "width": 175
     },
     {
       "id": "falha_busca",
@@ -204,7 +204,7 @@
       "type": "security",
       "label": "blocked",
       "sublabel": "human_review",
-      "width": 176
+      "width": 175
     }
   ],
   "edges": [
@@ -245,7 +245,7 @@
       "id": "postgres-resposta",
       "from": "postgres",
       "to": "resposta",
-      "label": "evidência",
+      "label": "com Jev",
       "variant": "emphasis"
     },
     {
@@ -253,7 +253,9 @@
       "from": "sem_jev",
       "to": "embedding",
       "variant": "dashed",
-      "role": "branch"
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
     },
     {
       "id": "guardrail-bloqueia",
@@ -291,6 +293,16 @@
       "to": "falha_busca",
       "variant": "security",
       "role": "error"
+    },
+    {
+      "id": "postgres-agente",
+      "from": "postgres",
+      "to": "sem_jev",
+      "label": "trechos",
+      "variant": "dashed",
+      "role": "return",
+      "fromSide": "top",
+      "toSide": "right"
     }
   ],
   "cards": [
@@ -315,7 +327,7 @@
       "dot": "amber",
       "title": "O que aprender",
       "items": [
-        "Um só núcleo local serve as duas entradas: com Jev e sem Jev",
+        "Sem Jev, os trechos voltam ao agente, que responde sem OpenRouter",
         "remember só existe sem Jev e grava em memories.jsonl, o backup no Git"
       ]
     }
