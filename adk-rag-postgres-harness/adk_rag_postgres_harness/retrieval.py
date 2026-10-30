@@ -10,6 +10,8 @@ from .store import PostgresStore
 
 from rag_harness.indexer import file_hash  # noqa: E402
 
+MAX_READ_LINES = 400
+
 
 @dataclass(frozen=True)
 class Hit:
@@ -27,9 +29,57 @@ class Hit:
     stale: bool
 
 
+@dataclass(frozen=True)
+class FileLines:
+    path: str
+    start_line: int
+    end_line: int
+    total_lines: int
+    text: str
+    truncated: bool
+    stale: bool
+
+
 def read_lines(path: Path, start_line: int, end_line: int) -> str:
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     return "\n".join(lines[start_line - 1:end_line])
+
+
+def read_file(
+    path: str,
+    project: str,
+    start_line: int = 1,
+    end_line: int | None = None,
+    store: PostgresStore | None = None,
+) -> FileLines:
+    """Read an indexed file only, so `.env` and anything outside the repository stay out of reach."""
+
+    store = store or PostgresStore()
+    found = store.project(project)
+    if found is None:
+        raise ValueError(f"unknown project {project!r}; index it first")
+    state = store.file_states(found["id"]).get(path)
+    root = Path(found["root"]).resolve()
+    full = (root / path).resolve()
+    if state is None or not full.is_relative_to(root):
+        raise ValueError(f"{path!r} is not an indexed file of {project!r}")
+    if not full.is_file():
+        raise ValueError(f"{path!r} no longer exists; run the index again")
+    if start_line < 1 or (end_line is not None and end_line < start_line):
+        raise ValueError(f"invalid line range {start_line}-{end_line}")
+
+    lines = full.read_text(encoding="utf-8", errors="replace").splitlines()
+    last = len(lines) if end_line is None else min(end_line, len(lines))
+    served = min(last, start_line + MAX_READ_LINES - 1)
+    return FileLines(
+        path=path,
+        start_line=start_line,
+        end_line=served,
+        total_lines=len(lines),
+        text="\n".join(lines[start_line - 1:served]),
+        truncated=served < last,
+        stale=file_hash(str(full)) != state[0],
+    )
 
 
 def _project_id(store: PostgresStore, project: str) -> int:

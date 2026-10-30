@@ -4,8 +4,8 @@ A code memory on PostgreSQL and `pgvector`, built from open source parts. It
 keeps a repository indexed incrementally and searches it by meaning and by text.
 
 The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases 1
-to 3 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
-chunks, symbols, imports and memory. The MCP server and the ADK wiring come next.
+to 4 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
+chunks, symbols, imports, memory and the MCP server. The ADK wiring comes next.
 
 ## Start
 
@@ -64,6 +64,33 @@ repository's `.gitattributes`.
   so they are not copied into the memory file.
 - **Without Ollama:** the memory is saved and matches by text, and the next `index`
   embeds it.
+
+## MCP server
+
+The server gives an agent the same functions as the CLI, without Google ADK:
+`search_code`, `find_symbol`, `read_lines`, `remember` and `recall`. Each server
+serves one indexed project. To register it for Claude Code, run this in the target
+repository; the `local` scope keeps it out of Git, because the path is yours:
+
+```bash
+claude mcp add --scope local code-memory -- uv run --directory /path/to/adk-rag-postgres-harness \
+  --extra postgres python -m adk_rag_postgres_harness.cli mcp --project my-repo
+```
+
+Other stdio clients, such as `codex mcp add`, take the same command, but only Claude
+Code has been tested.
+
+- **Always loaded:** the tools set `anthropic/alwaysLoad`. Otherwise Claude Code hides
+  them behind its tool search, and the agent uses grep without ever seeing them.
+- **Reading files:** `read_lines` serves indexed files only, so `.env` and anything
+  outside the repository stay out of reach, and it returns at most 400 lines per call.
+- **Failures:** the tools return an error that says what to do. Without Ollama,
+  `search_code` and `recall` fail, while `remember`, `find_symbol` and `read_lines`
+  keep working.
+- **Freshness:** the server does not reindex. Until you run `index` again, new files
+  are not found, and `stale` marks files that changed.
+- **Worktrees:** the server reads the folder that was indexed, not the agent's
+  worktree.
 
 ## How it works
 

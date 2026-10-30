@@ -34,6 +34,15 @@ def main() -> None:
     uses_parser.add_argument("name")
     uses_parser.add_argument("--project", required=True)
 
+    read_parser = sub.add_parser("read", help="read lines of an indexed file")
+    read_parser.add_argument("path")
+    read_parser.add_argument("--project", required=True)
+    read_parser.add_argument("--start", type=int, default=1)
+    read_parser.add_argument("--end", type=int)
+
+    mcp_parser = sub.add_parser("mcp", help="serve the same tools to an agent over MCP (stdio)")
+    mcp_parser.add_argument("--project", required=True)
+
     remember_parser = sub.add_parser("remember", help="save a decision to the repository file and the database")
     remember_parser.add_argument("text")
     remember_parser.add_argument("--project", required=True)
@@ -61,6 +70,18 @@ def main() -> None:
             f"{report.project}: {report.files} files, {report.changed} changed, {report.removed} removed, "
             f"{report.embedded} chunks embedded with {report.model}, {report.memories} memories restored"
         )
+    elif args.command == "read":
+        from .retrieval import read_file
+
+        try:
+            result = read_file(args.path, args.project, args.start, args.end)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        print(result.text)
+    elif args.command == "mcp":
+        from .mcp_server import build_server
+
+        build_server(args.project).run("stdio")
     elif args.command == "remember":
         from .memory import MemoryRefused, remember
 
