@@ -15,6 +15,7 @@ from .code_chunks import (
     resolve_import,
 )
 from .embeddings import embed_texts, embedder_id, memory_embedder
+from .memory import restore_memories
 from .store import ChunkRow, FileRow, PostgresStore
 
 from rag_harness.chunker import chunk_file  # noqa: E402
@@ -35,6 +36,7 @@ class SyncReport:
     removed: int
     embedded: int
     model: str
+    memories: int = 0
 
 
 def _collection(path: str) -> str:
@@ -121,6 +123,8 @@ def sync(
     if changed or removed:
         _resolve_edges(store, project_id, root_path, set(current))
 
+    memories = restore_memories(store, project_id, root_path)
+
     # Chunks are written first: an interrupted run embeds the rest on the next one.
     model = embedder_id(embedder)
     missing = store.missing_embeddings(project_id, model)
@@ -131,4 +135,4 @@ def sync(
             store.put_embeddings(model, zip((row["content_hash"] for row in batch), vectors))
             if verbose:
                 print(f"embedded {start + len(batch)}/{len(missing)}", flush=True)
-    return SyncReport(name, len(current), len(changed), len(removed), len(missing), model)
+    return SyncReport(name, len(current), len(changed), len(removed), len(missing), model, memories)

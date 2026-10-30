@@ -34,6 +34,21 @@ def main() -> None:
     uses_parser.add_argument("name")
     uses_parser.add_argument("--project", required=True)
 
+    remember_parser = sub.add_parser("remember", help="save a decision to the repository file and the database")
+    remember_parser.add_argument("text")
+    remember_parser.add_argument("--project", required=True)
+    remember_parser.add_argument("--source", required=True, help="where it came from: a file, a PR, a conversation")
+    remember_parser.add_argument("--kind", default="note", choices=("decision", "convention", "handoff", "note"))
+    remember_parser.add_argument("--supersedes", help="the id of the memory this one replaces")
+
+    recall_parser = sub.add_parser("recall", help="search memories and feature progress and handoff logs")
+    recall_parser.add_argument("query")
+    recall_parser.add_argument("--project", required=True)
+    recall_parser.add_argument("--kind", choices=("decision", "convention", "handoff", "note", "progress"))
+    recall_parser.add_argument("--top-k", type=int, default=8)
+    recall_parser.add_argument("--include-superseded", action="store_true")
+    recall_parser.add_argument("--json", action="store_true")
+
     args = parser.parse_args()
     if args.command == "migrate":
         PostgresStore().migrate()
@@ -44,8 +59,27 @@ def main() -> None:
         report = sync(args.root, args.project, verbose=True)
         print(
             f"{report.project}: {report.files} files, {report.changed} changed, {report.removed} removed, "
-            f"{report.embedded} chunks embedded with {report.model}"
+            f"{report.embedded} chunks embedded with {report.model}, {report.memories} memories restored"
         )
+    elif args.command == "remember":
+        from .memory import MemoryRefused, remember
+
+        try:
+            memory, embedded = remember(args.text, args.project, args.source, args.kind, args.supersedes)
+        except MemoryRefused as exc:
+            raise SystemExit(str(exc)) from exc
+        print(f"saved {memory.id}" + ("" if embedded else " without a vector; the next index embeds it"))
+    elif args.command == "recall":
+        from .memory import recall
+
+        hits = recall(args.query, args.project, args.kind, args.top_k, args.include_superseded)
+        if args.json:
+            print(json.dumps([asdict(hit) for hit in hits], ensure_ascii=False, indent=2))
+            return
+        for hit in hits:
+            where = hit.memory_id if hit.origin == "memory" else f"{hit.source}:{hit.start_line}-{hit.end_line}"
+            first_line = hit.text.splitlines()[0][:80] if hit.text else ""
+            print(f"{hit.score:.4f}  {hit.kind}  {where}  {first_line}")
     elif args.command == "symbol":
         from .retrieval import find_symbol
 

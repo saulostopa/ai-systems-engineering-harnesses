@@ -27,6 +27,11 @@ class Hit:
     stale: bool
 
 
+def read_lines(path: Path, start_line: int, end_line: int) -> str:
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(lines[start_line - 1:end_line])
+
+
 def _project_id(store: PostgresStore, project: str) -> int:
     found = store.project(project)
     if found is None:
@@ -71,7 +76,6 @@ def search_code(
         full = root / row["path"]
         if not full.is_file():
             continue
-        lines = full.read_text(encoding="utf-8", errors="replace").splitlines()
         hits.append(Hit(
             path=row["path"],
             start_line=row["start_line"],
@@ -82,7 +86,7 @@ def search_code(
             score=row["score"],
             semantic_rank=row["semantic_rank"],
             lexical_rank=row["lexical_rank"],
-            text="\n".join(lines[row["start_line"] - 1:row["end_line"]]),
+            text=read_lines(full, row["start_line"], row["end_line"]),
             stale=file_hash(str(full)) != row["file_hash"],
         ))
     return hits

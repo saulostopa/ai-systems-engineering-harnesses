@@ -4,8 +4,8 @@ A code memory on PostgreSQL and `pgvector`, built from open source parts. It
 keeps a repository indexed incrementally and searches it by meaning and by text.
 
 The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases 1
-and 2 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
-chunks, symbols and imports. Memory, the MCP server and the ADK wiring come next.
+to 3 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
+chunks, symbols, imports and memory. The MCP server and the ADK wiring come next.
 
 ## Start
 
@@ -37,6 +37,33 @@ uv run python -m adk_rag_postgres_harness.cli uses src/contexts/user/useUser.tsx
 
 `tests/test_sync.py` needs the container running and creates
 a temporary database for each test; without the container it is skipped.
+
+## Memory
+
+```bash
+uv run python -m adk_rag_postgres_harness.cli remember "Retries live in the API client." \
+  --project my-repo --kind decision --source "PR 12"
+uv run python -m adk_rag_postgres_harness.cli recall "where do retries live" --project my-repo
+```
+
+`remember` writes to `docs/harness/memories.jsonl` in the target repository
+(`HARNESS_MEMORY_FILE` changes the path) and to the database. **Commit that file:**
+Git is the backup, and `index` makes the database match it. On a new machine, clone
+the repository and run `index`; a branch switch works the same way. A damaged line,
+such as a merge conflict, stops `index` and is never overwritten. To merge parallel
+branches without conflicts, add `docs/harness/memories.jsonl merge=union` to the
+repository's `.gitattributes`.
+
+- **Credentials:** `remember` refuses text or sources that look like a credential,
+  without repeating the value. The check uses patterns, so it reduces the risk but
+  does not replace reviewing the file in the diff.
+- **Replacing a decision:** `--supersedes <id>` keeps the old memory in the file and
+  hides it from `recall`, unless you pass `--include-superseded`.
+- **Feature logs:** `recall` also searches `docs/harness/session-handoff.md` and each
+  feature's `progress.md` and `handoff.md`. They are already versioned and indexed,
+  so they are not copied into the memory file.
+- **Without Ollama:** the memory is saved and matches by text, and the next `index`
+  embeds it.
 
 ## How it works
 

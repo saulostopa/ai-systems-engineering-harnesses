@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import os
 import re
 from dataclasses import dataclass
@@ -237,14 +239,141 @@ class PostgresStore:
         with self.connect() as conn:
             return list(conn.execute(
                 """
-                SELECT DISTINCT ON (c.content_hash) c.content_hash, c.content
-                FROM chunks c
-                LEFT JOIN embeddings e ON e.content_hash = c.content_hash AND e.model = %s
-                WHERE c.project_id = %s AND e.content_hash IS NULL
-                ORDER BY c.content_hash
+                SELECT DISTINCT ON (t.content_hash) t.content_hash, t.content
+                FROM (
+                    SELECT content_hash, content FROM chunks WHERE project_id = %(project_id)s
+                    UNION ALL
+                    SELECT content_hash, text FROM memories WHERE project_id = %(project_id)s
+                ) AS t
+                LEFT JOIN embeddings e ON e.content_hash = t.content_hash AND e.model = %(model)s
+                WHERE e.content_hash IS NULL
+                ORDER BY t.content_hash
                 """,
-                (model, project_id),
+                {"model": model, "project_id": project_id},
             ))
+
+    @contextlib.contextmanager
+    def memory_lock(self, project_id: int):
+        """Serialize writers of a project's memory file, such as two MCP clients."""
+
+        with self.connect() as conn:
+            conn.execute("SELECT pg_advisory_xact_lock(%s)", (project_id,))
+            yield
+
+    def replace_memories(self, project_id: int, memories: Iterable) -> None:
+        """Mirror the versioned file, so a memory removed there also leaves the database."""
+
+        memories = list(memories)
+        with self.connect() as conn, conn.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM memories WHERE project_id = %s AND NOT (id = ANY(%s))",
+                (project_id, [memory.id for memory in memories]),
+            )
+            cursor.executemany(
+                """
+                INSERT INTO memories (
+                    project_id, id, kind, text, source, created_at, superseded_by, content_hash, search_text
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (project_id, id) DO UPDATE SET
+                    source = EXCLUDED.source,
+                    created_at = EXCLUDED.created_at,
+                    superseded_by = EXCLUDED.superseded_by
+                """,
+                [
+                    (
+                        project_id, memory.id, memory.kind, memory.text, memory.source, memory.created_at,
+                        memory.superseded_by, hashlib.sha256(memory.text.encode("utf-8")).hexdigest(),
+                        search_text(memory.source, memory.text),
+                    )
+                    for memory in memories
+                ],
+            )
+
+    def recall(
+        self,
+        project_id: int,
+        query: str,
+        query_embedding: list[float],
+        model: str,
+        log_paths: str,
+        kind_filter: str | None = None,
+        file_filter: str | None = None,
+        include_files: bool = True,
+        include_superseded: bool = False,
+        top_k: int = 8,
+    ) -> list[dict]:
+        """Reciprocal rank fusion over memories and the chunks of feature logs."""
+
+        memory_scope = "" if include_superseded else "AND m.superseded_by IS NULL"
+        if kind_filter:
+            memory_scope += " AND m.kind = %(kind)s"
+        file_scope = "AND f.path ~ %(log_paths)s"
+        if file_filter:
+            file_scope += " AND f.path ~ %(file_filter)s"
+        if not include_files:
+            file_scope += " AND false"
+        sql = f"""
+            WITH semantic AS (
+                SELECT origin, ref, row_number() OVER (ORDER BY distance, origin, ref) AS rank
+                FROM (
+                    SELECT 'memory' AS origin, m.id AS ref, e.embedding <=> %(vector)s::vector AS distance
+                    FROM memories m
+                    JOIN embeddings e ON e.content_hash = m.content_hash AND e.model = %(model)s
+                    WHERE m.project_id = %(project_id)s {memory_scope}
+                    UNION ALL
+                    SELECT 'file', c.id::text, e.embedding <=> %(vector)s::vector
+                    FROM chunks c
+                    JOIN files f ON f.id = c.file_id
+                    JOIN embeddings e ON e.content_hash = c.content_hash AND e.model = %(model)s
+                    WHERE c.project_id = %(project_id)s {file_scope}
+                    ORDER BY distance
+                    LIMIT {CANDIDATES}
+                ) AS nearest
+            ),
+            lexical AS (
+                SELECT origin, ref, row_number() OVER (ORDER BY text_rank DESC, origin, ref) AS rank
+                FROM (
+                    SELECT 'memory' AS origin, m.id AS ref, ts_rank_cd(m.search_tsv, q.tsq) AS text_rank
+                    FROM memories m, to_tsquery('simple', %(lexical)s) AS q(tsq)
+                    WHERE m.project_id = %(project_id)s {memory_scope} AND m.search_tsv @@ q.tsq
+                    UNION ALL
+                    SELECT 'file', c.id::text, ts_rank_cd(c.search_tsv, q.tsq)
+                    FROM chunks c
+                    JOIN files f ON f.id = c.file_id,
+                    to_tsquery('simple', %(lexical)s) AS q(tsq)
+                    WHERE c.project_id = %(project_id)s {file_scope} AND c.search_tsv @@ q.tsq
+                    ORDER BY text_rank DESC
+                    LIMIT {CANDIDATES}
+                ) AS matched
+            ),
+            fused AS (
+                SELECT origin, ref, COALESCE(1.0 / ({RRF_K} + s.rank), 0) + COALESCE(1.0 / ({RRF_K} + l.rank), 0) AS score
+                FROM semantic s
+                FULL JOIN lexical l USING (origin, ref)
+            )
+            SELECT x.origin, x.ref, x.score::float AS score,
+                   m.kind AS memory_kind, m.text AS memory_text, m.source AS memory_source,
+                   m.created_at, m.superseded_by,
+                   f.path, c.start_line, c.end_line
+            FROM fused x
+            LEFT JOIN memories m ON x.origin = 'memory' AND m.project_id = %(project_id)s AND m.id = x.ref
+            LEFT JOIN chunks c ON x.origin = 'file' AND c.id = CASE WHEN x.origin = 'file' THEN x.ref::bigint END
+            LEFT JOIN files f ON f.id = c.file_id
+            ORDER BY x.score DESC, x.origin DESC, x.ref
+            LIMIT %(top_k)s
+        """
+        params = {
+            "file_filter": file_filter,
+            "kind": kind_filter,
+            "lexical": lexical_query(query),
+            "log_paths": log_paths,
+            "model": model,
+            "project_id": project_id,
+            "top_k": top_k,
+            "vector": vector_literal(query_embedding),
+        }
+        with self.connect() as conn:
+            return list(conn.execute(sql, params).fetchall())
 
     def put_embeddings(self, model: str, items: Iterable[tuple[str, list[float]]]) -> None:
         with self.connect() as conn, conn.cursor() as cursor:
