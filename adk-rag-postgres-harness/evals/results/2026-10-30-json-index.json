@@ -1,0 +1,1109 @@
+{
+ "model": "json:openrouter:voyageai/voyage-code-4",
+ "runs": [
+  {
+   "scope": "routed",
+   "strategy": "hybrid",
+   "overall": {
+    "questions": 32,
+    "hit@1": 0.344,
+    "hit@3": 0.656,
+    "hit@5": 0.719,
+    "hit@8": 0.844,
+    "mrr": 0.519
+   },
+   "by_type": {
+    "code": {
+     "questions": 15,
+     "hit@1": 0.4,
+     "hit@3": 0.733,
+     "hit@5": 0.867,
+     "hit@8": 1.0,
+     "mrr": 0.608
+    },
+    "docs": {
+     "questions": 5,
+     "hit@1": 0.4,
+     "hit@3": 0.8,
+     "hit@5": 0.8,
+     "hit@8": 1.0,
+     "mrr": 0.629
+    },
+    "memory": {
+     "questions": 6,
+     "hit@1": 0.0,
+     "hit@3": 0.167,
+     "hit@5": 0.167,
+     "hit@8": 0.167,
+     "mrr": 0.056
+    },
+    "symbol": {
+     "questions": 6,
+     "hit@1": 0.5,
+     "hit@3": 0.833,
+     "hit@5": 0.833,
+     "hit@8": 1.0,
+     "mrr": 0.667
+    }
+   },
+   "questions": [
+    {
+     "id": "c01",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/index.ts",
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c02",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "c03",
+     "type": "code",
+     "rank": 5,
+     "top": [
+      "src/lib/biometrik-api/media.ts",
+      "src/contexts/user/UserProvider.tsx",
+      "src/screens/Unlogged/Login/index.tsx"
+     ]
+    },
+    {
+     "id": "c04",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/utils/splashBackground.ts",
+      "src/screens/Unlogged/Splash/index.tsx",
+      "src/lib/biometrik-api/media.ts"
+     ]
+    },
+    {
+     "id": "c05",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/i18n/index.ts",
+      "scripts/harness/verify-i18n.mjs",
+      "src/screens/Logged/Profile/index.tsx"
+     ]
+    },
+    {
+     "id": "c06",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c07",
+     "type": "code",
+     "rank": 6,
+     "top": [
+      "src/utils/homeProgress.ts",
+      "src/utils/activityOverview.ts",
+      "src/utils/mesocycleProgress.ts"
+     ]
+    },
+    {
+     "id": "c08",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/endpoints/bodyWeight.ts",
+      "src/utils/apiUser.ts",
+      "src/lib/biometrik-api/schemas/session.ts"
+     ]
+    },
+    {
+     "id": "c09",
+     "type": "code",
+     "rank": 6,
+     "top": [
+      "src/contexts/user/UserProvider.tsx",
+      "src/routes/Router.tsx",
+      "src/utils/homeProgress.ts"
+     ]
+    },
+    {
+     "id": "c10",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/utils/apiError.ts",
+      "src/lib/biometrik-api/http.ts"
+     ]
+    },
+    {
+     "id": "c11",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/media.ts",
+      "src/screens/Logged/Player/ExercisePage/index.tsx",
+      "src/components/Video/index.tsx"
+     ]
+    },
+    {
+     "id": "c12",
+     "type": "code",
+     "rank": 3,
+     "top": [
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/config.ts"
+     ]
+    },
+    {
+     "id": "c13",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/contexts/toast/ToastProvider.tsx"
+     ]
+    },
+    {
+     "id": "c14",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/screens/Logged/NewTraining/SelectExercises/index.tsx",
+      "src/screens/Logged/NewTraining/Details/index.tsx",
+      "src/screens/Logged/NewCycle/AddTraining/index.tsx"
+     ]
+    },
+    {
+     "id": "c15",
+     "type": "code",
+     "rank": 4,
+     "top": [
+      "App.tsx",
+      "src/screens/Logged/Profile/index.tsx",
+      "src/i18n/index.ts"
+     ]
+    },
+    {
+     "id": "s01",
+     "type": "symbol",
+     "rank": 6,
+     "top": [
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "s02",
+     "type": "symbol",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/tokenStore.ts",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "s03",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "s04",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/hooks/useRandomImage.ts",
+      "src/hooks/useImageSources.ts",
+      "src/screens/Logged/NewCycle/NewCycle/index.tsx"
+     ]
+    },
+    {
+     "id": "s05",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/components/StreakFlame/index.tsx",
+      "src/components/Icon/Fire.tsx",
+      "src/screens/Logged/FeedTab/index.tsx"
+     ]
+    },
+    {
+     "id": "s06",
+     "type": "symbol",
+     "rank": 3,
+     "top": [
+      "src/contexts/user/UserProvider.tsx",
+      "src/screens/Logged/TrainingsTab/index.tsx",
+      "src/contexts/data/useData.tsx"
+     ]
+    },
+    {
+     "id": "d01",
+     "type": "docs",
+     "rank": 1,
+     "top": [
+      "docs/architecture/data-layer.md",
+      "README.md",
+      "AGENTS.md"
+     ]
+    },
+    {
+     "id": "d02",
+     "type": "docs",
+     "rank": 2,
+     "top": [
+      "docs/harness/feature_list.json",
+      "AGENTS.md",
+      "package.json"
+     ]
+    },
+    {
+     "id": "d03",
+     "type": "docs",
+     "rank": 2,
+     "top": [
+      "docs/harness/progress.md",
+      "AGENTS.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "d04",
+     "type": "docs",
+     "rank": 1,
+     "top": [
+      "docs/architecture/data-layer.md",
+      "docs/exec-plans/completed/mobile-auth-nextjs-integration.md",
+      "docs/exec-plans/completed/mobile-auth-nextjs-integration.md"
+     ]
+    },
+    {
+     "id": "d05",
+     "type": "docs",
+     "rank": 7,
+     "top": [
+      "docs/harness/features/mobile-i18n-language-switching/clean-state.md",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/mobile-i18n-language-switching/progress.md"
+     ]
+    },
+    {
+     "id": "m01",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "m02",
+     "type": "memory",
+     "rank": 3,
+     "top": [
+      "docs/exec-plans/backlog/supabase-project-id-decision.md",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/supabase-project-id-decision/handoff.md"
+     ]
+    },
+    {
+     "id": "m03",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/features/home-streak-progress/progress.md",
+      "docs/harness/feature_list.json",
+      "docs/exec-plans/completed/home-streak-progress.md"
+     ]
+    },
+    {
+     "id": "m04",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/feature_list.json",
+      "docs/harness/feature_list.json",
+      "docs/harness/feature_list.json"
+     ]
+    },
+    {
+     "id": "m05",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/features/mobile-logged-api-integration/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "m06",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/features/splash-random-background-rotation/progress.md",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    }
+   ]
+  },
+  {
+   "scope": "routed",
+   "strategy": "semantic",
+   "overall": {
+    "questions": 32,
+    "hit@1": 0.562,
+    "hit@3": 0.75,
+    "hit@5": 0.844,
+    "hit@8": 0.875,
+    "mrr": 0.668
+   },
+   "by_type": {
+    "code": {
+     "questions": 15,
+     "hit@1": 0.733,
+     "hit@3": 0.933,
+     "hit@5": 0.933,
+     "hit@8": 0.933,
+     "mrr": 0.822
+    },
+    "docs": {
+     "questions": 5,
+     "hit@1": 0.2,
+     "hit@3": 0.4,
+     "hit@5": 0.8,
+     "hit@8": 0.8,
+     "mrr": 0.367
+    },
+    "memory": {
+     "questions": 6,
+     "hit@1": 0.0,
+     "hit@3": 0.333,
+     "hit@5": 0.5,
+     "hit@8": 0.667,
+     "mrr": 0.2
+    },
+    "symbol": {
+     "questions": 6,
+     "hit@1": 1.0,
+     "hit@3": 1.0,
+     "hit@5": 1.0,
+     "hit@8": 1.0,
+     "mrr": 1.0
+    }
+   },
+   "questions": [
+    {
+     "id": "c01",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/contexts/user/UserProvider.tsx",
+      "src/lib/biometrik-api/index.ts",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c02",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "c03",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/tokenStore.ts",
+      "src/contexts/user/UserProvider.tsx",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "c04",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/utils/splashBackground.ts",
+      "src/utils/backgroundImages.ts",
+      "src/components/Global/Screen/index.tsx"
+     ]
+    },
+    {
+     "id": "c05",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/i18n/index.ts",
+      "src/screens/Logged/Profile/index.tsx",
+      "scripts/harness/verify-i18n.mjs"
+     ]
+    },
+    {
+     "id": "c06",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "app.config.ts"
+     ]
+    },
+    {
+     "id": "c07",
+     "type": "code",
+     "rank": null,
+     "top": [
+      "src/utils/activityOverview.ts",
+      "src/utils/mesocycleProgress.ts",
+      "src/utils/homeProgress.ts"
+     ]
+    },
+    {
+     "id": "c08",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/endpoints/bodyWeight.ts",
+      "src/utils/bodyWeight.ts",
+      "src/lib/biometrik-api/schemas/bodyWeight.ts"
+     ]
+    },
+    {
+     "id": "c09",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/utils/onboarding.ts",
+      "src/utils/splashBackground.ts",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c10",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/utils/apiError.ts",
+      "src/lib/biometrik-api/http.ts"
+     ]
+    },
+    {
+     "id": "c11",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/components/Video/index.tsx",
+      "src/screens/Logged/Player/ExercisePage/index.tsx",
+      "src/components/CoverPlayer/index.tsx"
+     ]
+    },
+    {
+     "id": "c12",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/config.ts",
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/client.ts"
+     ]
+    },
+    {
+     "id": "c13",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/errors.ts"
+     ]
+    },
+    {
+     "id": "c14",
+     "type": "code",
+     "rank": 3,
+     "top": [
+      "src/screens/Logged/NewCycle/AddTraining/index.tsx",
+      "src/screens/Logged/NewTraining/ChooseExercise/index.tsx",
+      "src/screens/Logged/NewTraining/SelectExercises/index.tsx"
+     ]
+    },
+    {
+     "id": "c15",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/contexts/user/UserProvider.tsx",
+      "src/components/Icon/SignOut.tsx",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "s01",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/contexts/user/useUser.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserContext.tsx"
+     ]
+    },
+    {
+     "id": "s02",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/tokenStore.ts",
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/client.ts"
+     ]
+    },
+    {
+     "id": "s03",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/utils/apiError.ts",
+      "src/lib/biometrik-api/http.ts"
+     ]
+    },
+    {
+     "id": "s04",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/hooks/useRandomImage.ts",
+      "src/hooks/useImageSources.ts",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "s05",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/components/StreakFlame/index.tsx",
+      "src/components/Icon/Fire.tsx",
+      "src/components/StreakFlame/styles.ts"
+     ]
+    },
+    {
+     "id": "s06",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/contexts/data/useData.tsx",
+      "src/contexts/data/DataProvider.tsx",
+      "src/contexts/data/index.ts"
+     ]
+    },
+    {
+     "id": "d01",
+     "type": "docs",
+     "rank": 4,
+     "top": [
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "d02",
+     "type": "docs",
+     "rank": null,
+     "top": [
+      "package.json",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "d03",
+     "type": "docs",
+     "rank": 4,
+     "top": [
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/progress.md",
+      "docs/harness/features/training-library/progress.md"
+     ]
+    },
+    {
+     "id": "d04",
+     "type": "docs",
+     "rank": 1,
+     "top": [
+      "docs/architecture/data-layer.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "d05",
+     "type": "docs",
+     "rank": 3,
+     "top": [
+      "docs/harness/features/mobile-i18n-language-switching/clean-state.md",
+      "docs/exec-plans/completed/mobile-i18n-language-switching.md",
+      "docs/harness/features/mobile-i18n-language-switching/handoff.md"
+     ]
+    },
+    {
+     "id": "m01",
+     "type": "memory",
+     "rank": 2,
+     "top": [
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/exec-plans/active/mobile-logged-writes-and-supabase-removal.md",
+      "docs/harness/session-handoff.md"
+     ]
+    },
+    {
+     "id": "m02",
+     "type": "memory",
+     "rank": 3,
+     "top": [
+      "docs/harness/session-handoff.md",
+      "docs/harness/features/supabase-project-id-decision/clean-state.md",
+      "docs/harness/features/supabase-project-id-decision/handoff.md"
+     ]
+    },
+    {
+     "id": "m03",
+     "type": "memory",
+     "rank": 5,
+     "top": [
+      "docs/harness/features/home-streak-progress/progress.md",
+      "docs/harness/features/home-streak-progress/clean-state.md",
+      "docs/exec-plans/completed/home-streak-progress.md"
+     ]
+    },
+    {
+     "id": "m04",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/feature_list.json",
+      "docs/harness/feature_list.json",
+      "docs/harness/feature_list.json"
+     ]
+    },
+    {
+     "id": "m05",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/exec-plans/backlog/app-training-photo-proof.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md",
+      "docs/harness/features/app-training-photo-proof/progress.md"
+     ]
+    },
+    {
+     "id": "m06",
+     "type": "memory",
+     "rank": 6,
+     "top": [
+      "docs/harness/features/splash-random-background-rotation/progress.md",
+      "docs/harness/features/splash-random-background-rotation/progress.md",
+      "docs/harness/features/local-dev-run/progress.md"
+     ]
+    }
+   ]
+  },
+  {
+   "scope": "routed",
+   "strategy": "keyword",
+   "overall": {
+    "questions": 32,
+    "hit@1": 0.219,
+    "hit@3": 0.5,
+    "hit@5": 0.625,
+    "hit@8": 0.656,
+    "mrr": 0.373
+   },
+   "by_type": {
+    "code": {
+     "questions": 15,
+     "hit@1": 0.2,
+     "hit@3": 0.6,
+     "hit@5": 0.8,
+     "hit@8": 0.8,
+     "mrr": 0.413
+    },
+    "docs": {
+     "questions": 5,
+     "hit@1": 0.4,
+     "hit@3": 0.6,
+     "hit@5": 0.8,
+     "hit@8": 0.8,
+     "mrr": 0.55
+    },
+    "memory": {
+     "questions": 6,
+     "hit@1": 0.0,
+     "hit@3": 0.0,
+     "hit@5": 0.0,
+     "hit@8": 0.167,
+     "mrr": 0.028
+    },
+    "symbol": {
+     "questions": 6,
+     "hit@1": 0.333,
+     "hit@3": 0.667,
+     "hit@5": 0.667,
+     "hit@8": 0.667,
+     "mrr": 0.472
+    }
+   },
+   "questions": [
+    {
+     "id": "c01",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/http.ts",
+      "src/contexts/user/UserProvider.tsx",
+      "src/lib/biometrik-api/index.ts"
+     ]
+    },
+    {
+     "id": "c02",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/media.ts"
+     ]
+    },
+    {
+     "id": "c03",
+     "type": "code",
+     "rank": null,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/lib/biometrik-api/media.ts",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c04",
+     "type": "code",
+     "rank": 4,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/lib/biometrik-api/media.ts",
+      "src/contexts/theme/withDarkTheme.tsx"
+     ]
+    },
+    {
+     "id": "c05",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/i18n/index.ts",
+      "scripts/harness/verify-i18n.mjs",
+      "src/screens/Unlogged/Login/index.tsx"
+     ]
+    },
+    {
+     "id": "c06",
+     "type": "code",
+     "rank": 2,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "src/contexts/user/UserProvider.tsx"
+     ]
+    },
+    {
+     "id": "c07",
+     "type": "code",
+     "rank": 4,
+     "top": [
+      "src/utils/homeProgress.ts",
+      "src/lib/biometrik-api/errors.ts",
+      "src/utils/activityOverview.ts"
+     ]
+    },
+    {
+     "id": "c08",
+     "type": "code",
+     "rank": 3,
+     "top": [
+      "src/lib/biometrik-api/schemas/session.ts",
+      "src/contexts/user/UserProvider.tsx",
+      "src/lib/biometrik-api/endpoints/bodyWeight.ts"
+     ]
+    },
+    {
+     "id": "c09",
+     "type": "code",
+     "rank": null,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/media.ts"
+     ]
+    },
+    {
+     "id": "c10",
+     "type": "code",
+     "rank": 3,
+     "top": [
+      "src/lib/biometrik-api/media.ts",
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/lib/biometrik-api/errors.ts"
+     ]
+    },
+    {
+     "id": "c11",
+     "type": "code",
+     "rank": 3,
+     "top": [
+      "src/lib/biometrik-api/media.ts",
+      "src/lib/biometrik-api/schemas/dashboard.ts",
+      "src/screens/Logged/Player/ExercisePage/index.tsx"
+     ]
+    },
+    {
+     "id": "c12",
+     "type": "code",
+     "rank": 5,
+     "top": [
+      "src/lib/biometrik-api/http.ts",
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/media.ts"
+     ]
+    },
+    {
+     "id": "c13",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/http.ts",
+      "src/components/WeightModal/index.tsx",
+      "src/screens/Logged/TrainingDetails/index.tsx"
+     ]
+    },
+    {
+     "id": "c14",
+     "type": "code",
+     "rank": 1,
+     "top": [
+      "src/screens/Logged/NewTraining/SelectExercises/index.tsx",
+      "src/routes/Logged.tsx",
+      "src/screens/Logged/TrainingsTab/index.tsx"
+     ]
+    },
+    {
+     "id": "c15",
+     "type": "code",
+     "rank": null,
+     "top": [
+      "src/screens/Logged/Profile/index.tsx",
+      "src/components/WeightModal/index.tsx",
+      "src/i18n/index.ts"
+     ]
+    },
+    {
+     "id": "s01",
+     "type": "symbol",
+     "rank": null,
+     "top": [
+      "src/screens/Unlogged/Login/index.tsx",
+      "src/contexts/user/UserProvider.tsx",
+      "src/screens/Logged/FeedTab/index.tsx"
+     ]
+    },
+    {
+     "id": "s02",
+     "type": "symbol",
+     "rank": 2,
+     "top": [
+      "src/lib/biometrik-api/index.ts",
+      "src/lib/biometrik-api/tokenStore.ts",
+      "src/lib/biometrik-api/media.ts"
+     ]
+    },
+    {
+     "id": "s03",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/lib/biometrik-api/errors.ts",
+      "src/lib/biometrik-api/http.ts",
+      "src/contexts/data/DataProvider.tsx"
+     ]
+    },
+    {
+     "id": "s04",
+     "type": "symbol",
+     "rank": 3,
+     "top": [
+      "src/screens/Logged/MesocycleDetails/index.tsx",
+      "src/screens/Logged/TrainingsTab/index.tsx",
+      "src/hooks/useRandomImage.ts"
+     ]
+    },
+    {
+     "id": "s05",
+     "type": "symbol",
+     "rank": 1,
+     "top": [
+      "src/components/StreakFlame/index.tsx",
+      "src/screens/Logged/FeedTab/index.tsx",
+      "src/screens/Logged/FeedTab/index.tsx"
+     ]
+    },
+    {
+     "id": "s06",
+     "type": "symbol",
+     "rank": null,
+     "top": [
+      "src/screens/Logged/TrainingsTab/index.tsx",
+      "src/screens/Logged/FeedTab/index.tsx",
+      "src/screens/Logged/FeedTab/index.tsx"
+     ]
+    },
+    {
+     "id": "d01",
+     "type": "docs",
+     "rank": 2,
+     "top": [
+      "AGENTS.md",
+      "docs/architecture/data-layer.md",
+      "ARCHITECTURE.md"
+     ]
+    },
+    {
+     "id": "d02",
+     "type": "docs",
+     "rank": 1,
+     "top": [
+      "AGENTS.md",
+      "docs/harness/progress.md",
+      "docs/harness/features/splash-random-background-rotation/progress.md"
+     ]
+    },
+    {
+     "id": "d03",
+     "type": "docs",
+     "rank": 1,
+     "top": [
+      "AGENTS.md",
+      "docs/harness/progress.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "d04",
+     "type": "docs",
+     "rank": 4,
+     "top": [
+      "docs/exec-plans/completed/mobile-auth-nextjs-integration.md",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/mobile-auth-nextjs-integration/progress.md"
+     ]
+    },
+    {
+     "id": "d05",
+     "type": "docs",
+     "rank": null,
+     "top": [
+      "src/i18n/locales/en-us.json",
+      "docs/harness/feature_list.json",
+      "AGENTS.md"
+     ]
+    },
+    {
+     "id": "m01",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/feature_list.json",
+      "REPOSITORY.md",
+      "docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md"
+     ]
+    },
+    {
+     "id": "m02",
+     "type": "memory",
+     "rank": 6,
+     "top": [
+      "docs/harness/feature_list.json",
+      "docs/exec-plans/backlog/supabase-project-id-decision.md",
+      "docs/harness/features/training-details-figma/progress.md"
+     ]
+    },
+    {
+     "id": "m03",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/feature_list.json",
+      "docs/harness/feature_list.json",
+      "docs/harness/features/home-streak-progress/progress.md"
+     ]
+    },
+    {
+     "id": "m04",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "src/i18n/locales/en-us.json",
+      "docs/harness/feature_list.json",
+      "src/i18n/locales/en-us.json"
+     ]
+    },
+    {
+     "id": "m05",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/features/training-details-figma/progress.md",
+      "docs/harness/features/mobile-logged-api-integration/progress.md",
+      "docs/harness/feature_list.json"
+     ]
+    },
+    {
+     "id": "m06",
+     "type": "memory",
+     "rank": null,
+     "top": [
+      "docs/harness/feature_list.json",
+      "docs/harness/features/splash-random-background-rotation/progress.md",
+      "docs/harness/features/training-details-figma/progress.md"
+     ]
+    }
+   ]
+  }
+ ]
+}
