@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import posixpath
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from .store import PostgresStore
 from rag_harness.indexer import file_hash  # noqa: E402
 
 MAX_READ_LINES = 400
+MAX_DEFINITION_LINES = 80
+MAX_DEFINITIONS = 3
+DEFINITION_SCORE = 1.0
+# A name written in code style, such as useUser, StreakFlame or get_user.
+_CODE_NAME = re.compile(r"\b(?:[A-Za-z][A-Za-z0-9]*[a-z0-9][A-Z][A-Za-z0-9]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+)\b")
 
 
 @dataclass(frozen=True)
@@ -116,6 +122,41 @@ def where_used(name: str, project: str, store: PostgresStore | None = None, limi
     return store.find_importers(project_id, name, limit=limit)
 
 
+def code_names(query: str) -> list[str]:
+    return list(dict.fromkeys(_CODE_NAME.findall(query)))
+
+
+def _definition_hits(query: str, found: dict, store: PostgresStore) -> list[Hit]:
+    """Where a name in the query is defined: ranking finds its many uses before its one definition."""
+
+    names = code_names(query)
+    if not names:
+        return []
+    states = store.file_states(found["id"])
+    hits: list[Hit] = []
+    for name in names:
+        rows = [row for row in store.find_symbols(found["id"], name) if row["name"].lower() == name.lower()]
+        for row in rows[:MAX_DEFINITIONS]:
+            full = safe_file(found["root"], row["path"])
+            if full is None:
+                continue
+            end_line = min(row["end_line"], row["start_line"] + MAX_DEFINITION_LINES - 1)
+            hits.append(Hit(
+                path=row["path"],
+                start_line=row["start_line"],
+                end_line=end_line,
+                collection="code",
+                kind=row["kind"],
+                name=row["name"],
+                score=DEFINITION_SCORE,
+                semantic_rank=None,
+                lexical_rank=None,
+                text=read_lines(full, row["start_line"], end_line),
+                stale=file_hash(str(full)) != states[row["path"]][0],
+            ))
+    return hits
+
+
 def search_code(
     query: str,
     project: str,
@@ -123,20 +164,29 @@ def search_code(
     top_k: int = 8,
     embedder=None,
     store: PostgresStore | None = None,
-    strategy: str = "hybrid",
+    strategy: str | None = None,
 ) -> list[Hit]:
     store = store or PostgresStore()
     found = store.project(project)
     if found is None:
         raise ValueError(f"unknown project {project!r}; index it first")
+    # Across collections, full text favors long documents over code: on the Biometrik
+    # questions, hybrid reached 56% at hit@5 and semantic 91%. See evals/.
+    strategy = strategy or ("hybrid" if collection else "semantic")
     # Keyword search needs no model, so it also works without Ollama.
     vector, model = None, ""
     if strategy != "keyword":
         embedder = embedder or memory_embedder()
         vector, model = embed_query(embedder, query), embedder_id(embedder)
     rows = store.search(found["id"], query, vector, model, collection, top_k, strategy)
-    hits: list[Hit] = []
+    hits = [] if collection == "docs" else _definition_hits(query, found, store)
+    definitions = [(hit.path, hit.start_line, hit.end_line) for hit in hits]
     for row in rows:
+        if any(
+            path == row["path"] and row["start_line"] <= end and start <= row["end_line"]
+            for path, start, end in definitions
+        ):
+            continue
         full = safe_file(found["root"], row["path"])
         if full is None:
             continue
@@ -153,4 +203,4 @@ def search_code(
             text=read_lines(full, row["start_line"], row["end_line"]),
             stale=file_hash(str(full)) != row["file_hash"],
         ))
-    return hits
+    return hits[:top_k]

@@ -146,8 +146,12 @@ HARNESS_RAG_PROVIDER=postgres HARNESS_RAG_PROJECT=my-repo uv run adk web
 - **Embedding cache:** `embeddings` is keyed by content hash and model. Identical
   text is embedded once, vectors of several models coexist, and returning to a
   model recomputes nothing.
-- **Hybrid search:** reciprocal rank fusion over the top 50 from HNSW and the top
+- **Searching one collection:** reciprocal rank fusion over the top 50 from HNSW and the top
   50 from full text. Identifiers are split, so `login` finds `handleLogin`.
+- **Searching everything:** without a collection, the search goes by meaning only. On the
+  Biometrik questions, full text pulled long documents above the code: 56% at hit@5
+  against 91% (`evals/`).
+- **Names in code style:** `useUser` or `get_user` return their definition first.
 - **Results:** the database gives the path and lines, and the text is read from
   disk. `stale` marks a file that changed after indexing, because its lines may
   have moved.

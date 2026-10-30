@@ -318,6 +318,37 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(len(self._indexed_paths()), 3)
 
+    def test_without_a_collection_the_search_goes_by_meaning(self):
+        self._sync()
+        hits = self._search("how does the checkout flow work")
+        self.assertTrue(hits)
+        self.assertTrue(all(hit.lexical_rank is None for hit in hits))
+
+    def test_with_a_collection_the_search_also_matches_text(self):
+        self._sync()
+        self.assertTrue(any(hit.lexical_rank for hit in self._search("login", collection="code")))
+
+    def test_a_name_in_code_style_finds_its_definition_first(self):
+        self._write("src/one.ts", "import { addToCart } from './cart';\naddToCart(1); addToCart(2);\n")
+        self._write("src/two.ts", "import { addToCart } from './cart';\naddToCart(3); addToCart(4);\n")
+        self._sync()
+        for kwargs in ({}, {"collection": "code"}, {"collection": "code", "strategy": "keyword"}):
+            hits = self._search("Where is addToCart defined?", **kwargs)
+            self.assertEqual((hits[0].path, hits[0].kind, hits[0].score), ("src/cart.ts", "function", 1.0), kwargs)
+            self.assertEqual([hit.path for hit in hits].count("src/cart.ts"), 1, kwargs)
+
+    def test_a_definition_does_not_enter_a_docs_search(self):
+        self._sync()
+        hits = self._search("Where is addToCart defined?", collection="docs")
+        self.assertNotIn("src/cart.ts", [hit.path for hit in hits])
+
+    def test_a_long_definition_is_cut(self):
+        body = "".join(f"  step{number}();\n" for number in range(200))
+        self._write("src/long.ts", f"export function longOne() {{\n{body}}}\n")
+        self._sync()
+        hit = self._search("Where is longOne?")[0]
+        self.assertEqual((hit.path, hit.end_line - hit.start_line + 1), ("src/long.ts", 80))
+
     def test_uses_finds_packages_and_normalizes_paths(self):
         self._write("src/page.ts", "import { navigate } from '@scope/nav';\nimport { addToCart } from './cart';\nexport const a = 1;\n")
         self._sync()

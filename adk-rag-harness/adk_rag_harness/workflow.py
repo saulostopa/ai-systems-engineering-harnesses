@@ -50,6 +50,15 @@ class WorkflowResult:
 
 
 DEFAULT_COLLECTIONS = ("docs", "code", "area")
+# Without the first sentence, a question such as "what happens on a 401?" reads as
+# general knowledge, and the model answers it without looking at the repository.
+NEEDS_RETRIEVAL_INSTRUCTION = (
+    "This assistant answers questions about one specific code repository. "
+    "Does this request need evidence from that repository? The probability is high for any "
+    "question about how something works, where it is, what a rule says, why it was decided "
+    "or what its status is, even when it sounds general. It is low only for greetings, small "
+    "talk and requests to write generic text."
+)
 COLLECTION_HINTS = {
     "docs": "documentation, plans, policies and configuration",
     "code": "source code such as functions, components and modules",
@@ -187,7 +196,7 @@ class AdkRagWorkflow:
                 [
                     DecisionQuestion(
                         "needs_retrieval",
-                        "Does this request require external knowledge or repository evidence?",
+                        NEEDS_RETRIEVAL_INSTRUCTION,
                         QuestionType.NOUL,
                     )
                 ],

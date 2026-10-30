@@ -58,7 +58,9 @@ def search(question: dict, project: str, scope: str, strategy: str, embedder, st
     if collection == "memory":
         hits = recall(question["question"], project, top_k=TOP_K, embedder=embedder, store=store)
         return [hit.source for hit in hits]
-    hits = search_code(question["question"], project, collection, TOP_K, embedder, store, strategy)
+    hits = search_code(
+        question["question"], project, collection, TOP_K, embedder, store, None if strategy == "default" else strategy
+    )
     return [hit.path for hit in hits]
 
 
@@ -100,7 +102,7 @@ def run(questions: list[dict], project: str, scope: str, strategy: str, embedder
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--questions", default=str(ROOT / "evals" / "biometrik_questions.json"))
-    parser.add_argument("--strategies", default="hybrid,semantic,keyword")
+    parser.add_argument("--strategies", default="default,hybrid,semantic,keyword")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -114,7 +116,7 @@ def main() -> None:
     check_questions(questions, Path(found["root"]), set(store.file_states(found["id"])))
 
     # A cold model would charge its load time to the first question.
-    search(questions[0], project, "all", "hybrid", embedder, store)
+    search(questions[0], project, "all", "default", embedder, store)
     runs = [
         run(questions, project, scope, strategy, embedder, store)
         for scope in ("all", "routed")

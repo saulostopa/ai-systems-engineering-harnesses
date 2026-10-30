@@ -20,7 +20,7 @@ def main() -> None:
     index_parser.add_argument("--project", help="defaults to the folder name")
     index_parser.add_argument("--move", action="store_true", help="the project now lives in this folder")
 
-    search_parser = sub.add_parser("search", help="hybrid search; text comes from disk")
+    search_parser = sub.add_parser("search", help="search by meaning and text; text comes from disk")
     search_parser.add_argument("query")
     search_parser.add_argument("--project", required=True)
     search_parser.add_argument("--collection", choices=("code", "docs"))

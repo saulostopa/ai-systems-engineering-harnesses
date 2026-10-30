@@ -54,7 +54,7 @@ def build_server(project: str, embedder=None, store: PostgresStore | None = None
     @server.tool(structured_output=False, meta=ALWAYS_LOAD)
     @_guarded
     def search_code(query: str, collection: Literal["code", "docs"] | None = None, top_k: int = 8) -> dict:
-        """Search the repository by meaning and by text. Returns path, lines and text read from disk."""
+        """Search the repository by meaning. Pass `collection` when you know it: `code` or `docs` also match by text. A name in code style finds its definition first. Returns path, lines and text read from disk."""
 
         hits = search_hits(query, project, collection, _top_k(top_k), embedder=embedder, store=store)
         return {"hits": [asdict(hit) for hit in hits]}
