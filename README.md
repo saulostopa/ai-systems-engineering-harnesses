@@ -40,7 +40,7 @@ package directory is also the repository being managed. See
 ```bash
 ollama pull nomic-embed-text
 cd rag-harness
-RAG_EMBEDDER=ollama OLLAMA_EMBED_MODEL=nomic-embed-text \
+HARNESS_EMBED_PROVIDER=ollama HARNESS_EMBED_MODEL=nomic-embed-text \
 python3 -m rag_harness index /path/to/your-repository --verbose
 ```
 
@@ -55,9 +55,9 @@ HARNESS_RAG_PROVIDER=demo uv run adk web
 For a real local index, point the indexer at the target repository and pass the resulting index path to the ADK app:
 
 ```bash
-RAG_EMBEDDER=ollama OLLAMA_EMBED_MODEL=nomic-embed-text \
+HARNESS_EMBED_PROVIDER=ollama HARNESS_EMBED_MODEL=nomic-embed-text \
 PYTHONPATH=rag-harness python3 -m rag_harness index /path/to/your-repository --verbose
-HARNESS_RAG_PROVIDER=rag-harness \
+HARNESS_RAG_PROVIDER=index \
 HARNESS_RAG_DOCS_INDEX=/path/to/your-repository/.rag_index \
 uv run adk web
 ```

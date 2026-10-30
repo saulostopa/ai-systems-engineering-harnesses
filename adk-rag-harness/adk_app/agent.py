@@ -2,11 +2,8 @@
 
 OpenRouter with Jev (``typesafe/jev-router``) is the default for both the
 conversation model and the typed decisions, so ``uv run adk web`` only needs
-an OpenRouter key. ``HARNESS_CHAT_PROVIDER`` selects the conversation model
-(``openrouter`` or ``ollama``) and ``HARNESS_DECISION_PROVIDER`` selects the
-typed decision provider (``demo``, ``ollama-system-one``,
-``openrouter-system-one`` or ``jev``). CLI modes are intentionally opt-in and
-are described in the course documentation.
+an OpenRouter key. Every setting follows ``HARNESS_<ROLE>_<SETTING>``; see
+``.env.example`` for the full list and defaults.
 """
 
 from __future__ import annotations
@@ -22,42 +19,31 @@ from adk_rag_harness.contracts import DecisionAnswer, DecisionQuestion, Decision
 from adk_rag_harness.jev_sdk import TypeSafeSdkDecisionProvider
 from adk_rag_harness.openai_compatible import OpenAICompatibleDecisionProvider, load_openrouter_api_key
 from adk_rag_harness.rag_adapter import RagHarnessAdapter
+from adk_rag_harness.settings import check_settings
 from adk_rag_harness.usage import litellm_logger
 from adk_rag_harness.workflow import DEFAULT_COLLECTIONS, AdkRagWorkflow
 
 
-OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-os.environ.setdefault("OLLAMA_API_BASE", OLLAMA_API_BASE)
+check_settings()
+
+DEFAULT_MODELS = {
+    "chat": {"openrouter": "typesafe/jev-router", "ollama": "llama3.1:8b"},
+    "decision": {"openrouter": "typesafe/jev-router", "ollama": "qwen2.5:14b", "typesafe": "jev-latest"},
+}
 
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-DEFAULT_OPENROUTER_MODEL = "typesafe/jev-router"
-OPENROUTER_CHAT_MODEL = os.getenv("OPENROUTER_CHAT_MODEL", DEFAULT_OPENROUTER_MODEL).removeprefix("openrouter/")
-OPENROUTER_DECISION_MODEL = os.getenv("OPENROUTER_DECISION_MODEL", DEFAULT_OPENROUTER_MODEL).removeprefix("openrouter/")
-
-# Conversation model configuration:
-#   HARNESS_CHAT_PROVIDER=openrouter                  # default, OPENROUTER_CHAT_MODEL
-#   HARNESS_CHAT_PROVIDER=ollama                      # local, OLLAMA_MODEL
-# Decision provider configuration:
-#   HARNESS_DECISION_PROVIDER=openrouter-system-one   # default, OPENROUTER_DECISION_MODEL
-#   HARNESS_DECISION_PROVIDER=ollama-system-one       # local, OLLAMA_DECISION_MODEL
-#   HARNESS_DECISION_PROVIDER=demo                    # deterministic demo
-#   HARNESS_DECISION_PROVIDER=jev                     # official TypeSafe API, needs key
-#   HARNESS_RAG_PROVIDER=demo                         # demo evidence
-#   HARNESS_RAG_PROVIDER=rag-harness                  # real local index
-#   HARNESS_RAG_{DOCS,CODE,AREA}_INDEX=<path>         # one index per collection
-# The decision settings affect only the typed routing decisions inside
-# run_workflow. Qwen is the local decision default because it was more
-# consistent than llama3.1:8b in the golden routing prompts.
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 CHAT_PROVIDER = os.getenv("HARNESS_CHAT_PROVIDER", "openrouter")
-DEFAULT_DECISION_PROVIDER = "openrouter-system-one"
-DECISION_PROVIDER = os.getenv("HARNESS_DECISION_PROVIDER", DEFAULT_DECISION_PROVIDER)
+CHAT_MODEL = os.getenv("HARNESS_CHAT_MODEL", DEFAULT_MODELS["chat"].get(CHAT_PROVIDER, "")).removeprefix("openrouter/")
+# Qwen is the local decision default because it was more consistent than
+# llama3.1:8b in the golden routing prompts.
+DECISION_PROVIDER = os.getenv("HARNESS_DECISION_PROVIDER", "openrouter")
 DECISION_MODEL = os.getenv(
-    "HARNESS_DECISION_MODEL",
-    os.getenv("OLLAMA_DECISION_MODEL", "qwen2.5:14b"),
-)
+    "HARNESS_DECISION_MODEL", DEFAULT_MODELS["decision"].get(DECISION_PROVIDER, "")
+).removeprefix("openrouter/")
 RAG_PROVIDER = os.getenv("HARNESS_RAG_PROVIDER", "demo")
+GUARDRAIL = os.getenv("HARNESS_GUARDRAIL", "off").lower() in ("on", "1", "true", "yes")
 
 
 class DemoDecisions:
@@ -105,28 +91,30 @@ class DemoRag:
 def _build_workflow() -> AdkRagWorkflow:
     if DECISION_PROVIDER == "demo":
         decisions = DemoDecisions()
-    elif DECISION_PROVIDER == "ollama-system-one":
+    elif DECISION_PROVIDER == "ollama":
         decisions = OpenAICompatibleDecisionProvider(
-            base_url=os.getenv("OLLAMA_DECISION_BASE_URL", f"{OLLAMA_API_BASE}/v1"),
+            base_url=f"{OLLAMA_BASE_URL}/v1",
             model=DECISION_MODEL,
+            provider="ollama",
         )
-    elif DECISION_PROVIDER == "openrouter-system-one":
+    elif DECISION_PROVIDER == "openrouter":
         decisions = OpenAICompatibleDecisionProvider(
             base_url=OPENROUTER_BASE_URL,
-            model=OPENROUTER_DECISION_MODEL,
+            model=DECISION_MODEL,
             api_key=_require_openrouter_key(),
+            provider="openrouter",
         )
-    elif DECISION_PROVIDER == "jev":
-        decisions = TypeSafeSdkDecisionProvider()
+    elif DECISION_PROVIDER == "typesafe":
+        decisions = TypeSafeSdkDecisionProvider(model=DECISION_MODEL)
     else:
         raise RuntimeError(
             f"Unsupported HARNESS_DECISION_PROVIDER={DECISION_PROVIDER!r}; "
-            "use demo, ollama-system-one, openrouter-system-one or jev"
+            "use openrouter, ollama, typesafe or demo"
         )
     if RAG_PROVIDER == "demo":
         rag = DemoRag()
         collections = DEFAULT_COLLECTIONS
-    elif RAG_PROVIDER == "rag-harness":
+    elif RAG_PROVIDER == "index":
         repository_root = Path(__file__).parents[2]
         indexes = _rag_collection_indexes(repository_root)
         # Ledger lines belong to the repository the indexes were built from.
@@ -139,10 +127,9 @@ def _build_workflow() -> AdkRagWorkflow:
         collections = tuple(indexes)
     else:
         raise RuntimeError(
-            f"Unsupported HARNESS_RAG_PROVIDER={RAG_PROVIDER!r}; use demo or rag-harness"
+            f"Unsupported HARNESS_RAG_PROVIDER={RAG_PROVIDER!r}; use index or demo"
         )
-    enable_guardrail = os.getenv("HARNESS_ENABLE_GUARDRAIL", "0").lower() in ("1", "true", "yes")
-    return AdkRagWorkflow(decisions, rag, enable_guardrail=enable_guardrail, collections=collections)
+    return AdkRagWorkflow(decisions, rag, enable_guardrail=GUARDRAIL, collections=collections)
 
 
 def _rag_collection_indexes(repository_root: Path) -> dict[str, str]:
@@ -172,8 +159,7 @@ def _install_usage_logger() -> None:
 
     import litellm
 
-    model = OPENROUTER_CHAT_MODEL if CHAT_PROVIDER == "openrouter" else OLLAMA_MODEL
-    logger = litellm_logger(CHAT_PROVIDER, model)
+    logger = litellm_logger(CHAT_PROVIDER, CHAT_MODEL)
     callbacks = [cb for cb in litellm.callbacks if type(cb).__name__ != "LedgerLogger"]
     litellm.callbacks = callbacks + ([logger] if logger is not None else [])
 
@@ -189,12 +175,12 @@ def _build_model():
     _install_usage_logger()
     if CHAT_PROVIDER == "openrouter":
         return LiteLlm(
-            model=f"openrouter/{OPENROUTER_CHAT_MODEL}",
+            model=f"openrouter/{CHAT_MODEL}",
             api_key=_require_openrouter_key(),
             api_base=OPENROUTER_BASE_URL,
         )
     if CHAT_PROVIDER == "ollama":
-        return LiteLlm(model=f"ollama_chat/{OLLAMA_MODEL}")
+        return LiteLlm(model=f"ollama_chat/{CHAT_MODEL}", api_base=OLLAMA_BASE_URL)
     raise RuntimeError(
         f"Unsupported HARNESS_CHAT_PROVIDER={CHAT_PROVIDER!r}; use openrouter or ollama"
     )

@@ -1,10 +1,11 @@
 """Pluggable embeddings — n-gram hashing (local fallback), Ollama or OpenRouter.
 
 No external model needed for the POC: the fallback generates deterministic
-n-gram embeddings (works offline). If `OLLAMA_API_URL` is set, uses Ollama
-(e.g. nomic-embed-text) when reachable. `RAG_EMBEDDER=openrouter` uses the
-hosted embeddings endpoint (e.g. voyageai/voyage-code-4); it is never chosen
-automatically because it is billed per token.
+n-gram embeddings (works offline). Without `HARNESS_EMBED_PROVIDER`, Ollama
+(`OLLAMA_BASE_URL`, nomic-embed-text) is used when reachable.
+`HARNESS_EMBED_PROVIDER=openrouter` uses the hosted embeddings endpoint
+(voyageai/voyage-code-4 by default); it is never chosen automatically because
+it is billed per token. `HARNESS_EMBED_MODEL` overrides the model.
 """
 
 from __future__ import annotations
@@ -22,10 +23,18 @@ from typing import Any
 from .usage import record
 
 DIM = 256
-OLLAMA_API_URL = os.environ.get("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+DEFAULT_OLLAMA_EMBED_MODEL = "nomic-embed-text"
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-OPENROUTER_EMBED_MODEL = os.environ.get("OPENROUTER_EMBED_MODEL", "voyageai/voyage-code-4")
+DEFAULT_OPENROUTER_EMBED_MODEL = "voyageai/voyage-code-4"
+
+# Removed names fail loudly instead of being ignored silently.
+REMOVED_SETTINGS = {
+    "RAG_EMBEDDER": "HARNESS_EMBED_PROVIDER",
+    "OPENROUTER_EMBED_MODEL": "HARNESS_EMBED_MODEL",
+    "OLLAMA_EMBED_MODEL": "HARNESS_EMBED_MODEL",
+    "OLLAMA_API_URL": "OLLAMA_BASE_URL",
+}
 
 
 def embedder_id(embedder: Any) -> str:
@@ -83,7 +92,7 @@ class NGramEmbedder:
 
 
 class OllamaEmbedder:
-    def __init__(self, api_url: str = OLLAMA_API_URL, model: str = OLLAMA_MODEL) -> None:
+    def __init__(self, api_url: str = OLLAMA_BASE_URL, model: str = DEFAULT_OLLAMA_EMBED_MODEL) -> None:
         self.api_url = api_url.rstrip("/")
         self.model = model
         self.model_id = f"ollama:{model}"
@@ -127,7 +136,7 @@ class OpenRouterEmbedder:
 
     def __init__(
         self,
-        model: str = OPENROUTER_EMBED_MODEL,
+        model: str = DEFAULT_OPENROUTER_EMBED_MODEL,
         api_key: str | None = None,
         base_url: str = OPENROUTER_BASE_URL,
         batch_size: int = 64,
@@ -193,16 +202,26 @@ class OpenRouterEmbedder:
             return json.loads(res.read())
 
 
+def check_settings(environ: dict[str, str] = os.environ) -> None:
+    problems = [f"{old} was renamed to {new}" for old, new in REMOVED_SETTINGS.items() if old in environ]
+    if problems:
+        raise RuntimeError("Outdated harness settings: " + "; ".join(problems) + ".")
+
+
 def make_embedder() -> NGramEmbedder | OllamaEmbedder | OpenRouterEmbedder:
-    provider = os.environ.get("RAG_EMBEDDER", "").lower()
+    check_settings()
+    provider = os.environ.get("HARNESS_EMBED_PROVIDER", "").lower()
+    model = os.environ.get("HARNESS_EMBED_MODEL", "")
     if provider == "ngram":
         return NGramEmbedder()
     if provider == "ollama":
-        return OllamaEmbedder()
+        return OllamaEmbedder(model=model or DEFAULT_OLLAMA_EMBED_MODEL)
     if provider == "openrouter":
-        return OpenRouterEmbedder()
+        return OpenRouterEmbedder(model=model or DEFAULT_OPENROUTER_EMBED_MODEL)
+    if provider:
+        raise RuntimeError(f"Unsupported HARNESS_EMBED_PROVIDER={provider!r}; use openrouter, ollama or ngram")
     try:
-        ollama = OllamaEmbedder()
+        ollama = OllamaEmbedder(model=model or DEFAULT_OLLAMA_EMBED_MODEL)
         if ollama._available():
             return ollama
     except Exception:

@@ -8,7 +8,7 @@ The hard-harness agents receive an injectable provider
   - StubProvider:      deterministic, for offline tests/examples.
   - make_provider():   environment-based selection, with NO network surprise:
         1. OPENROUTER_API_KEY defined  -> OpenRouter
-        2. OLLAMA_API_URL defined      -> Ollama (short probe)
+        2. OLLAMA_BASE_URL defined      -> Ollama (short probe)
         3. otherwise                   -> Stub (with a clear warning)
 
 Cost: providers expose `last_usage` (tokens) and `last_cost_usd`; the agents
@@ -211,11 +211,13 @@ def make_provider(prefer_ollama: bool = False) -> LLMProvider:
     """Environment-based selection — no network surprise (course lesson: decide by evidence).
 
     1. OPENROUTER_API_KEY defined -> OpenRouter (this session's default).
-    2. OLLAMA_API_URL defined (or prefer_ollama) and Ollama responds -> Ollama.
+    2. OLLAMA_BASE_URL defined (or prefer_ollama) and Ollama responds -> Ollama.
     3. otherwise -> Stub with a clear warning.
     """
+    if "OLLAMA_API_URL" in os.environ:
+        raise LLMError("OLLAMA_API_URL was renamed to OLLAMA_BASE_URL")
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
-    ollama_url = os.environ.get("OLLAMA_API_URL", "")
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "")
     if api_key:
         try:
             return OpenRouterProvider(api_key=api_key)
@@ -227,5 +229,5 @@ def make_provider(prefer_ollama: bool = False) -> LLMProvider:
             return OllamaProvider(base_url=base)
         print(f"[llm] warning: Ollama ({base}) did not respond — using stub")
     if not api_key and not ollama_url and not prefer_ollama:
-        print("[llm] warning: no provider configured (OPENROUTER_API_KEY or OLLAMA_API_URL) — using deterministic stub")
+        print("[llm] warning: no provider configured (OPENROUTER_API_KEY or OLLAMA_BASE_URL) — using deterministic stub")
     return StubProvider()

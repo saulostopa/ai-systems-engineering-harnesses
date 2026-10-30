@@ -253,6 +253,27 @@ def test_openrouter_embedder_registra_custo_da_indexacao_no_ledger():
         assert line["project"] == "repo"
         assert (line["input_tokens"], line["cost_usd"], line["cost_source"]) == (7, 8.4e-07, "provider")
 
+
+def test_make_embedder_usa_os_nomes_harness_embed_e_rejeita_os_antigos():
+    from unittest import mock
+
+    from rag_harness.embeddings import NGramEmbedder, make_embedder
+
+    with mock.patch.dict(os.environ, {"HARNESS_EMBED_PROVIDER": "openrouter", "HARNESS_EMBED_MODEL": "openai/text-embedding-3-small",
+                                      "OPENROUTER_API_KEY": "test"}):
+        emb = make_embedder()
+        assert isinstance(emb, OpenRouterEmbedder) and emb.model == "openai/text-embedding-3-small"
+    with mock.patch.dict(os.environ, {"HARNESS_EMBED_PROVIDER": "ngram"}):
+        assert isinstance(make_embedder(), NGramEmbedder)
+    for env, expected in (({"RAG_EMBEDDER": "openrouter"}, "RAG_EMBEDDER was renamed to HARNESS_EMBED_PROVIDER"),
+                          ({"HARNESS_EMBED_PROVIDER": "claude"}, "Unsupported HARNESS_EMBED_PROVIDER")):
+        with mock.patch.dict(os.environ, env):
+            try:
+                make_embedder()
+                assert False, "must fail"
+            except RuntimeError as exc:
+                assert expected in str(exc)
+
 if __name__ == "__main__":
     import traceback
 

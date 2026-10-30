@@ -6,7 +6,7 @@ Contract: run(NodeInput) -> NodeOutput.
   - They NEVER transition status.
 
 Injectable LLM provider (llm/providers.py): OpenRouter by default (env
-OPENROUTER_API_KEY), optional Ollama (OLLAMA_API_URL), offline Stub.
+OPENROUTER_API_KEY), optional Ollama (OLLAMA_BASE_URL), offline Stub.
 The cost (provider usage) travels in the payload as `llm_cost` — the runner
 applies the budget (Limits.llm_budget).
 """

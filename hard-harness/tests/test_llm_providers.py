@@ -151,7 +151,7 @@ def test_make_provider_openrouter_quando_env():
 
 def test_make_provider_stub_sem_env():
     os.environ.pop("OPENROUTER_API_KEY", None)
-    os.environ.pop("OLLAMA_API_URL", None)
+    os.environ.pop("OLLAMA_BASE_URL", None)
     provider = make_provider()
     assert provider.name == "stub"
 
@@ -159,13 +159,13 @@ def test_make_provider_stub_sem_env():
 def test_make_provider_ollama_quando_env_e_responde():
     server, base = start_fake_server()
     os.environ.pop("OPENROUTER_API_KEY", None)
-    os.environ["OLLAMA_API_URL"] = base
+    os.environ["OLLAMA_BASE_URL"] = base
     try:
         provider = make_provider()
         # probe uses /api/tags (404 on the fake, but the URL exists => considered unavailable)
         assert provider.name == "stub" or provider.name == "ollama"
     finally:
-        os.environ.pop("OLLAMA_API_URL", None)
+        os.environ.pop("OLLAMA_BASE_URL", None)
         server.shutdown()
 
 
@@ -236,6 +236,17 @@ def test_openrouter_registra_custo_no_ledger_com_no_e_workflow():
     assert (line["harness"], line["component"], line["operation"], line["request_id"]) == ("hard-harness", "agent", "planner", "wf-1")
     assert (line["routed_model"], line["input_tokens"], line["output_tokens"], line["cost_usd"]) == ("deepseek/routed", 12, 7, 0.0003)
     assert "pergunta-secreta" not in json.dumps(line)
+
+
+def test_make_provider_rejeita_ollama_api_url_antigo():
+    os.environ["OLLAMA_API_URL"] = "http://localhost:11434"
+    try:
+        make_provider()
+        assert False, "the removed name must fail"
+    except LLMError as exc:
+        assert "OLLAMA_BASE_URL" in str(exc)
+    finally:
+        os.environ.pop("OLLAMA_API_URL", None)
 
 if __name__ == "__main__":
     import traceback

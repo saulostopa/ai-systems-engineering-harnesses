@@ -30,6 +30,7 @@ from adk_rag_harness.jev import JevDecisionProvider
 from adk_rag_harness.openai_compatible import OpenAICompatibleDecisionProvider
 from adk_rag_harness.policies import PolicyConfig, TripartitePolicy
 from adk_rag_harness.rag_adapter import RagHarnessAdapter
+from adk_rag_harness.settings import check_settings
 from adk_rag_harness.contracts import RetrievalRequest
 from adk_rag_harness.workflow import AdkRagWorkflow, WorkflowStatus
 
@@ -529,6 +530,21 @@ class UsageLedgerTests(unittest.TestCase):
         [line] = self.lines()
         self.assertEqual((line["request_id"], line["provider"], line["cost_source"]), ("e-123", "ollama", "provider"))
 
+
+
+class SettingsTests(unittest.TestCase):
+    def test_current_names_pass(self):
+        check_settings({"HARNESS_CHAT_PROVIDER": "openrouter", "HARNESS_DECISION_PROVIDER": "typesafe",
+                        "HARNESS_RAG_PROVIDER": "index", "OLLAMA_BASE_URL": "http://localhost:11434"})
+
+    def test_removed_names_and_values_fail_with_the_new_name(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            check_settings({"OPENROUTER_CHAT_MODEL": "x", "HARNESS_DECISION_PROVIDER": "openrouter-system-one",
+                            "HARNESS_RAG_PROVIDER": "rag-harness"})
+        message = str(ctx.exception)
+        self.assertIn("OPENROUTER_CHAT_MODEL was renamed to HARNESS_CHAT_MODEL", message)
+        self.assertIn("HARNESS_DECISION_PROVIDER=openrouter-system-one is now HARNESS_DECISION_PROVIDER=openrouter", message)
+        self.assertIn("HARNESS_RAG_PROVIDER=rag-harness is now HARNESS_RAG_PROVIDER=index", message)
 
 if __name__ == "__main__":
     unittest.main()

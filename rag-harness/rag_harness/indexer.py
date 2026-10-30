@@ -259,7 +259,7 @@ def semantic_search(index: Index, embedder, query: str, top_k: int = 5) -> list[
     if index.embedder and index.embedder != embedder_id(embedder):
         raise ValueError(
             f"index was built with {index.embedder} but the query uses {embedder_id(embedder)}; "
-            "set the same RAG_EMBEDDER or re-index"
+            "set the same HARNESS_EMBED_PROVIDER and HARNESS_EMBED_MODEL or re-index"
         )
     qvec = embedder.embed(query)
     scored = [(c, cosine(qvec, index.vectors[c.hash])) for c in index.chunks if c.hash in index.vectors]

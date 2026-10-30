@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 # The app defaults to OpenRouter; this eval exercises the local Ollama path.
 os.environ.setdefault("HARNESS_CHAT_PROVIDER", "ollama")
-os.environ.setdefault("HARNESS_DECISION_PROVIDER", "ollama-system-one")
+os.environ.setdefault("HARNESS_DECISION_PROVIDER", "ollama")
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -79,12 +79,10 @@ async def run_case(case_id: str, case: dict[str, str]) -> dict[str, object]:
 
 
 async def main() -> None:
-    if os.getenv("HARNESS_OFFLINE", "1") != "1":
-        raise SystemExit("Run this integration eval with HARNESS_OFFLINE=1.")
     results = []
     for case_id, case in CASES.items():
         results.append(await run_case(case_id, case))
-    print(json.dumps({"model": os.getenv("OLLAMA_MODEL", "llama3.1:8b"), "results": results}, indent=2))
+    print(json.dumps({"model": os.getenv("HARNESS_CHAT_MODEL", "llama3.1:8b"), "results": results}, indent=2))
 
 
 if __name__ == "__main__":
