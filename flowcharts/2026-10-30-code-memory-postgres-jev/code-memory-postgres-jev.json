@@ -1,0 +1,323 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Uma pergunta na code memory com Jev",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "caminho-feliz",
+        "label": "Pergunta com evidência",
+        "focus": [
+          "pergunta",
+          "guardrail",
+          "precisa_busca",
+          "colecao_estrategia",
+          "embedding",
+          "postgres",
+          "resposta"
+        ],
+        "note": "Siga a pergunta do OpenRouter até a busca local e de volta à resposta com as fontes."
+      },
+      {
+        "id": "saidas",
+        "label": "Saídas e falhas",
+        "focus": [
+          "guardrail",
+          "precisa_busca",
+          "colecao_estrategia",
+          "embedding",
+          "postgres",
+          "saida_inseguro",
+          "saida_direct",
+          "saida_clarify",
+          "falha_busca"
+        ],
+        "note": "Falhar na busca nunca vira resposta inventada: termina em blocked com human_review."
+      },
+      {
+        "id": "sem-jev",
+        "label": "Entrada sem Jev",
+        "focus": [
+          "sem_jev",
+          "embedding",
+          "postgres"
+        ],
+        "note": "O agente decide sozinho e usa o mesmo núcleo local, sem as decisões do Jev."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "conversa",
+      "label": "Entradas e resposta"
+    },
+    {
+      "id": "decisoes",
+      "label": "Decisões · Jev no OpenRouter"
+    },
+    {
+      "id": "local",
+      "label": "Busca local · grátis"
+    },
+    {
+      "id": "fim",
+      "label": "Saídas antecipadas",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "entrada",
+      "label": "Entrada",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "decisao",
+      "label": "Decisões pagas",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "evidencia",
+      "label": "Evidência e resposta",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "pergunta",
+    "guardrail",
+    "precisa_busca",
+    "colecao_estrategia",
+    "embedding",
+    "postgres",
+    "resposta"
+  ],
+  "nodes": [
+    {
+      "id": "pergunta",
+      "lane": "conversa",
+      "col": 0,
+      "type": "cloud",
+      "label": "Pergunta",
+      "sublabel": "OpenRouter · jev-router",
+      "width": 176
+    },
+    {
+      "id": "guardrail",
+      "lane": "decisoes",
+      "col": 1,
+      "type": "security",
+      "label": "Guardrail",
+      "sublabel": "is_safe? · opcional",
+      "width": 176
+    },
+    {
+      "id": "precisa_busca",
+      "lane": "decisoes",
+      "col": 2,
+      "type": "backend",
+      "label": "Buscar?",
+      "sublabel": "needs_retrieval",
+      "width": 176
+    },
+    {
+      "id": "colecao_estrategia",
+      "lane": "decisoes",
+      "col": 3,
+      "type": "backend",
+      "label": "Rota da busca",
+      "sublabel": "coleção e estratégia",
+      "width": 176
+    },
+    {
+      "id": "sem_jev",
+      "lane": "conversa",
+      "col": 4,
+      "type": "frontend",
+      "label": "Claude Code",
+      "sublabel": "sem Jev · MCP ou CLI",
+      "width": 176
+    },
+    {
+      "id": "embedding",
+      "lane": "local",
+      "col": 4,
+      "type": "backend",
+      "label": "Embedding",
+      "sublabel": "Ollama · Qwen3",
+      "width": 176
+    },
+    {
+      "id": "postgres",
+      "lane": "local",
+      "col": 5,
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "pgvector + disco",
+      "width": 176
+    },
+    {
+      "id": "resposta",
+      "lane": "conversa",
+      "col": 5,
+      "type": "cloud",
+      "label": "Resposta",
+      "sublabel": "OpenRouter · cita fontes",
+      "width": 176
+    },
+    {
+      "id": "saida_inseguro",
+      "lane": "fim",
+      "col": 1,
+      "type": "security",
+      "label": "blocked",
+      "sublabel": "entrada insegura",
+      "width": 176
+    },
+    {
+      "id": "saida_direct",
+      "lane": "fim",
+      "col": 2,
+      "type": "messagebus",
+      "label": "direct",
+      "sublabel": "ou clarify · sem busca",
+      "width": 176
+    },
+    {
+      "id": "saida_clarify",
+      "lane": "fim",
+      "col": 3,
+      "type": "messagebus",
+      "label": "clarify",
+      "sublabel": "confiança < 0,60",
+      "width": 176
+    },
+    {
+      "id": "falha_busca",
+      "lane": "fim",
+      "col": 4,
+      "type": "security",
+      "label": "blocked",
+      "sublabel": "human_review",
+      "width": 176
+    }
+  ],
+  "edges": [
+    {
+      "id": "pergunta-guardrail",
+      "from": "pergunta",
+      "to": "guardrail",
+      "variant": "emphasis",
+      "fromSide": "bottom"
+    },
+    {
+      "id": "guardrail-precisa",
+      "from": "guardrail",
+      "to": "precisa_busca",
+      "label": "seguro"
+    },
+    {
+      "id": "precisa-colecao",
+      "from": "precisa_busca",
+      "to": "colecao_estrategia",
+      "label": "sim"
+    },
+    {
+      "id": "colecao-embedding",
+      "from": "colecao_estrategia",
+      "to": "embedding",
+      "label": "≥ 0,60",
+      "variant": "emphasis"
+    },
+    {
+      "id": "embedding-postgres",
+      "from": "embedding",
+      "to": "postgres",
+      "label": "vetor",
+      "variant": "emphasis"
+    },
+    {
+      "id": "postgres-resposta",
+      "from": "postgres",
+      "to": "resposta",
+      "label": "evidência",
+      "variant": "emphasis"
+    },
+    {
+      "id": "semjev-embedding",
+      "from": "sem_jev",
+      "to": "embedding",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "guardrail-bloqueia",
+      "from": "guardrail",
+      "to": "saida_inseguro",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "precisa-dispensa",
+      "from": "precisa_busca",
+      "to": "saida_direct",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "colecao-incerta",
+      "from": "colecao_estrategia",
+      "to": "saida_clarify",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "ollama-falha",
+      "from": "embedding",
+      "to": "falha_busca",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "postgres-falha",
+      "from": "postgres",
+      "to": "falha_busca",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Onde cada coisa roda",
+      "items": [
+        "Conversa e decisões: typesafe/jev-router no OpenRouter, pago",
+        "Embeddings e busca: qwen3-embedding:4b no Ollama e Postgres, locais"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Estratégias e falhas",
+      "items": [
+        "Ollama fora, banco fora ou busca vazia: blocked com human_review",
+        "hybrid e semantic precisam do Ollama; keyword pula o embedding",
+        "memory busca decisões e logs de features, sempre por sentido e texto"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "O que aprender",
+      "items": [
+        "Um só núcleo local serve as duas entradas: com Jev e sem Jev",
+        "remember só existe sem Jev e grava em memories.jsonl, o backup no Git"
+      ]
+    }
+  ]
+}
