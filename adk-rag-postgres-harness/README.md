@@ -4,8 +4,8 @@ A code memory on PostgreSQL and `pgvector`, built from open source parts. It
 keeps a repository indexed incrementally and searches it by meaning and by text.
 
 The plan is in the course backlog (`docs/tasks/code-memory-postgres.md`). Phases 1
-to 5 are done: the Postgres core, incremental sync, hybrid search, syntax-aware
-chunks, symbols, imports, memory, the MCP server and the ADK wiring.
+to 7 are done: the Postgres core, incremental sync, search, syntax-aware chunks, symbols,
+imports, memory, the MCP server, the ADK wiring, the evaluation and the course.
 
 ## Quick View: How it Works
 
@@ -89,8 +89,9 @@ claude mcp add --scope local code-memory -- uv run --directory /path/to/adk-rag-
   --extra postgres python -m adk_rag_postgres_harness.cli mcp --project my-repo
 ```
 
-Other stdio clients, such as `codex mcp add`, take the same command, but only Claude
-Code has been tested.
+`agy mcp add` takes the same command, but its setting applies to every repository. In headless
+agy, allow the tools for the session with `--settings`, such as `mcp(code-memory/search_code)`.
+Claude Code and agy have been tested. `codex mcp add` should also work, but it has not been tested.
 
 - **Always loaded:** the tools set `anthropic/alwaysLoad`. Otherwise Claude Code hides
   them behind its tool search, and the agent uses grep without ever seeing them.
