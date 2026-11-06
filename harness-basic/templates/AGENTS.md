@@ -30,6 +30,53 @@
   - Which files are expected? What is OUT of scope?
   - How will success be verified?
 
+## 4b. Work in an isolated worktree
+
+The main checkout is reserved for integration. Give every feature or agent its
+own worktree and branch:
+
+```bash
+git fetch origin
+git worktree add ../wt-<feature-id> -b feature/<id> origin/develop
+cd ../wt-<feature-id>
+```
+
+Each worktree has its own dependency installation, caches and build outputs.
+Never copy a real `.env*` file into a worktree.
+
+Integrate in a detached worktree and validate the merged tip before publishing:
+
+```bash
+git fetch origin
+git worktree add --detach ../wt-integrate origin/develop
+git -C ../wt-integrate merge --no-ff feature/<id>
+cd ../wt-integrate
+<build and test commands>
+git push origin HEAD:refs/heads/develop
+```
+
+These commands use `develop` as the consumer-project example. Replace the
+integration ref when the target project uses another branch. This distribution
+repository itself integrates on `main`.
+
+For a fixed local service, use a detached worktree at a known SHA and a
+synthetic database. Keep it separate from the checkout receiving updates and
+give its process, port and database or volume a unique test identifier.
+
+```bash
+git worktree add --detach ../wt-service <known-sha>
+SERVICE_NAME=harness-test-<id> PORT=<unique-port> DATABASE_URL=<synthetic-db> <service-start-command>
+```
+
+Use `git worktree list`, `git worktree remove <path>` and `git worktree prune`
+to inspect and clean up. Remove orphaned worktrees without `--force`; reserve
+`--force` for temporary local CI worktrees. The same branch cannot be checked
+out in two worktrees. If the branch or remote diverges, stop and ask the owner.
+
+Agents must not run `reset --hard`, force pushes, `checkout -B`, `switch -C`,
+`branch -f/-D`, `worktree add -B`, `clean -f`, `stash drop/clear`, rebase or
+amend of a published commit.
+
 ## 5. How to verify the work
 
 - Follow `policies/definition-of-done.md` and `policies/evidence-required.md`.
