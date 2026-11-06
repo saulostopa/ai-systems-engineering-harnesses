@@ -62,3 +62,7 @@ git stash clear
 git rebase
 git commit --amend
 ```
+
+Use `./scripts/git-safe <command> ...` for Git commands that can change state.
+The installed `pre-push` hook also blocks ref deletion and non-fast-forward
+updates when a caller bypasses the wrapper.

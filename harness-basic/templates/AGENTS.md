@@ -77,6 +77,10 @@ Agents must not run `reset --hard`, force pushes, `checkout -B`, `switch -C`,
 `branch -f/-D`, `worktree add -B`, `clean -f`, `stash drop/clear`, rebase or
 amend of a published commit.
 
+Use `./scripts/git-safe <command> ...` for Git commands that can change state.
+The installed `pre-push` hook also blocks ref deletion and non-fast-forward
+updates when a caller bypasses the wrapper.
+
 ## 5. How to verify the work
 
 - Follow `policies/definition-of-done.md` and `policies/evidence-required.md`.

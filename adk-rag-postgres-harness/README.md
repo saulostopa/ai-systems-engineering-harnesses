@@ -78,6 +78,17 @@ Agents must not run `reset --hard`, force pushes, `checkout -B`, `switch -C`,
 `branch -f/-D`, `worktree add -B`, `clean -f`, `stash drop/clear`, rebase or
 amend of a published commit.
 
+Enable the repository-level push guard once per checkout:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Use `./scripts/git-safe <command> ...` for Git commands that can change state.
+The `pre-push` hook blocks ref deletion and non-fast-forward updates even when
+the wrapper is bypassed. The guard is provider-neutral and does not replace
+the repository owner's normal review and authorization process.
+
 ## Ingest a collection
 
 From the repository root, with the local RAG package available:

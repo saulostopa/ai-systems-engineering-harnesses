@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # pre-push — validates the harness before publishing (Lesson 09/11)
+if ! "$(dirname "$0")/../scripts/git-policy.sh" pre-push; then
+  echo "pre-push: Git policy blocked the push"
+  exit 1
+fi
 if ! "$(dirname "$0")/../scripts/validate-harness.sh"; then
   echo "pre-push: harness invalid — push blocked (or use --no-verify consciously)"
   exit 1
