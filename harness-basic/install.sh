@@ -68,6 +68,7 @@ else
 fi
 
 chmod +x "$TARGET/init.sh" "$TARGET/scripts/"*.sh 2>/dev/null
+chmod +x "$TARGET/scripts/git-safe" 2>/dev/null
 
 log "Installation complete. Next steps:"
 log "  1. edit AGENTS.md (sections 1 and 7) and feature_list.json"

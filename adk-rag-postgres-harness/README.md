@@ -27,7 +27,81 @@ The default connection is
 `postgresql://harness:harness@localhost:5433/harness_rag`. Copy `.env.example`
 to `.env` and export it to change a setting.
 
+## Work in isolated worktrees
+
+Keep the main checkout for integration. Give each feature or agent its own
+worktree and branch:
+
+```bash
+git fetch origin
+git worktree add ../wt-<feature-id> -b feature/<id> origin/main
+cd ../wt-<feature-id>
+uv sync --extra postgres
+```
+
+Each worktree owns its dependencies, caches, builds, index path and database
+project. Never copy a real `.env*` file into a worktree. Use a synthetic
+database and explicit test configuration for local services. The environment,
+`.venv`, Docker Compose project name, ports and volumes must be unique to the
+worktree or test identifier; never reuse a running service from another
+worktree.
+
+For a fixed service or evaluation, pin the checkout to a known SHA:
+
+```bash
+git worktree add --detach ../wt-service <known-sha>
+cd ../wt-service
+uv sync --extra postgres
+docker compose -p harness-test-<id> up -d postgres
+```
+
+The service and database must read this pinned worktree. They must not follow
+the agent's other worktree while it receives updates. The index is tied to the
+repository folder and revision used during indexing; re-run ingestion for a
+new revision instead of silently mixing files from two worktrees.
+
+Integrate in a detached worktree and validate the merged tip before publishing:
+
+```bash
+git fetch origin
+git worktree add --detach ../wt-integrate origin/main
+git -C ../wt-integrate merge --no-ff feature/<id>
+cd ../wt-integrate
+uv sync --extra postgres
+docker compose -p harness-integrate-<id> up -d postgres
+uv run --with pytest pytest
+git push origin HEAD:refs/heads/main
+```
+
+This standalone distribution uses `main` as its integration branch. When the
+harness is installed in a consumer repository, replace `origin/main` and
+`refs/heads/main` with that repository's integration ref, such as `develop`.
+
+Use `git worktree list` to inspect worktrees, `git worktree remove <path>` to
+remove a finished one and `git worktree prune` to clean stale administrative
+records. Remove orphaned worktrees without `--force`; reserve `--force` for
+temporary local CI worktrees. The same branch cannot be checked out in two
+worktrees. If a branch, remote or indexed revision diverges, stop and ask the
+repository owner.
+
+Agents must not run `reset --hard`, force pushes, `checkout -B`, `switch -C`,
+`branch -f/-D`, `worktree add -B`, `clean -f`, `stash drop/clear`, rebase or
+amend of a published commit.
+
+Enable the repository-level push guard once per checkout:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Use `./scripts/git-safe <command> ...` for Git commands that can change state.
+The `pre-push` hook blocks ref deletion and non-fast-forward updates even when
+the wrapper is bypassed. The guard is provider-neutral and does not replace
+the repository owner's normal review and authorization process.
+
 ## Index and search
+
+From the repository root, with the local RAG package available:
 
 ```bash
 uv run python -m adk_rag_postgres_harness.cli index /path/to/repo --project my-repo

@@ -49,6 +49,7 @@ fi
 require_file "policies/definition-of-done.md"
 require_file "policies/scope-control.md"
 require_file "policies/evidence-required.md"
+require_file "policies/git-worktrees.md"
 
 section "feature_list.json"
 FEATURE_LIST="$HARNESS/feature_list.json"

@@ -24,6 +24,8 @@ cd /absolute/path/to/project
 | `policies/scope-control.md` | Scope declared before editing | 07 |
 | `policies/definition-of-done.md` | Verifiable "done" criteria | 09 |
 | `policies/evidence-required.md` | Evidence format (command → expected → actual) | 09 |
+| `policies/git-worktrees.md` | Isolated feature, integration and service worktrees | 14 |
+| `scripts/git-safe` | Provider-neutral guard for destructive Git commands | 14 |
 | `init.sh` | Environment initialization | 06 |
 
 ## Minimal customization
