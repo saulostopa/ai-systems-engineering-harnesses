@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-import os
 import sys
+import time
 from pathlib import Path
 
+from .memory import recall
+from .query_log import log_query
+from .retrieval import search_code
 from .store import PostgresStore
+
+COLLECTIONS = ("code", "docs", "memory")
+STRATEGIES = ("hybrid", "semantic", "keyword")
 
 
 class PostgresRagAdapter:
@@ -17,41 +23,59 @@ class PostgresRagAdapter:
     a shared dependency later.
     """
 
-    def __init__(self, store: PostgresStore | None = None, rag_root: str | None = None) -> None:
-        root = Path(rag_root or Path(__file__).parents[2] / "rag-harness").resolve()
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
-        adk_root = root.parent / "adk-rag-harness"
+    def __init__(self, project: str, store: PostgresStore | None = None, embedder=None) -> None:
+        adk_root = Path(__file__).resolve().parents[2] / "adk-rag-harness"
         if str(adk_root) not in sys.path:
             sys.path.insert(0, str(adk_root))
         from adk_rag_harness.contracts import EvidenceChunk, RetrievalResponse
 
         self._EvidenceChunk = EvidenceChunk
         self._RetrievalResponse = RetrievalResponse
+        self.project = project
         self.store = store or PostgresStore()
-        self.embedder = None
+        self.embedder = embedder
+
+    def _code_or_docs(self, request):
+        hits = search_code(
+            request.query, self.project, request.collection, request.top_k, self.embedder, self.store, request.strategy
+        )
+        return tuple(
+            self._EvidenceChunk(
+                source=hit.path,
+                text=hit.text,
+                score=hit.score,
+                start_line=hit.start_line,
+                end_line=hit.end_line,
+                stale=hit.stale,
+            )
+            for hit in hits
+        )
+
+    def _memory(self, request):
+        """Saved decisions and feature logs; they are always searched by both meaning and text."""
+
+        hits = recall(request.query, self.project, top_k=request.top_k, embedder=self.embedder, store=self.store)
+        return tuple(
+            self._EvidenceChunk(
+                source=f"{hit.memory_id} ({hit.source})" if hit.origin == "memory" else hit.source,
+                text=hit.text,
+                score=hit.score,
+                start_line=hit.start_line,
+                end_line=hit.end_line,
+            )
+            for hit in hits
+        )
 
     def retrieve(self, request):
-        if self.embedder is None:
-            from rag_harness.embeddings import make_embedder
-
-            self.embedder = make_embedder()
-        results = self.store.search(
-            request.collection,
-            request.query,
-            self.embedder.embed(request.query),
-            request.top_k,
-            request.filters,
-        )
-        evidence = tuple(
-            self._EvidenceChunk(
-                source=row["source"],
-                text=row["content"],
-                score=float(row["score"]),
-                start_line=row["start_line"],
-                end_line=row["end_line"],
-            )
-            for row in results
+        if request.collection not in COLLECTIONS:
+            raise ValueError(f"unknown RAG collection: {request.collection}")
+        if request.strategy not in STRATEGIES:
+            raise ValueError(f"unknown retrieval strategy: {request.strategy}")
+        started = time.perf_counter()
+        evidence = self._memory(request) if request.collection == "memory" else self._code_or_docs(request)
+        log_query(
+            self.store, self.project, "adk", "retrieve", request.query, started,
+            [chunk.source for chunk in evidence], request.collection, request.strategy,
         )
         return self._RetrievalResponse(
             request=request,

@@ -20,8 +20,11 @@ screenshots as evidence (Lesson 09: proof, not opinion).
 1. **Start the app** — build (or dev server) with the real command; confirm the port is responding.
 2. **Create deterministic state** — intercept the API (`page.route` / mock) when you need specific data; never rely on random data.
 3. **Walk the real flow** — from the entry point to the end, like a user: click, fill, submit, go back. Also navigate the **edge states**: empty, error, loading, duplicated data.
-4. **Validate with vision** — at every step: layout (overlap, clipping, overflow), readable contrast, infinite loading, correct error messages, acceptable empty states. Take **screenshots as evidence** of every important step.
+   - **Fast Reactive Loop (~300ms)**: Drive high-frequency DOM transitions and micro-actions using fast typed decisions, reserving heavy multimodal vision calls for visual layout verification checkpoints.
+   - **Action Safety Guardrail**: Filter actions through `allow` / `ask` / `deny`. Never execute destructive actions (real checkouts, account deletion, drop data) without operator confirmation (HITL).
+4. **Validate with vision** — at checkpoint steps: layout (overlap, clipping, overflow), readable contrast, infinite loading, correct error messages, acceptable empty states. Take **screenshots as evidence** of every important step.
 5. **Issue a verdict per criterion** — for each acceptance criterion: `ACCEPTED` or `REJECTED`, with the screenshot and the observation that justifies it.
+
 
 ## Verdict — required format
 

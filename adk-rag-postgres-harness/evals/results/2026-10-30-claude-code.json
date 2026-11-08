@@ -1,0 +1,137 @@
+[
+ {
+  "id": "c01",
+  "type": "code",
+  "tools": {
+   "mcp__code-memory__search_code": 1,
+   "Grep": 1,
+   "Read": 1
+  },
+  "first_tool": "mcp__code-memory__search_code",
+  "used_mcp": true,
+  "cited": true,
+  "seconds": 9.2,
+  "listed_cost_usd": 0.2837689,
+  "answer": "A sessão salva é validada em `src/contexts/user/UserProvider.tsx:107-128`, no `useEffect` que roda quando o app monta.\n\n- Ele lê `apiAuthSession` do AsyncStorage (linha 108) e valida o `user` com `authUserSchema.safeParse` (linha 112).\n- Também exige que o `token` seja uma string não vazia (linha 115).\n- Se o formato estiver inválido, remove a chave e pede login de novo (linhas 115-120). Se estiver válido, chama `applyApiSession(token)` e preenche usuário e perfil (linhas 121-123).\n- A validação é só de formato local. Não vi nenhuma chamada à API para checar se o token ainda é aceito.\n- A sessão legada do Supabase é restaurada separadamente, em `supabase.auth.getSession()` (linha 130)."
+ },
+ {
+  "id": "c02",
+  "type": "code",
+  "tools": {
+   "Grep": 4,
+   "Read": 1
+  },
+  "first_tool": "Grep",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 13.6,
+  "listed_cost_usd": 0.11241999999999999,
+  "answer": "Quando uma chamada autenticada recebe 401, o app encerra a sessão do usuário.\n\n- `src/lib/biometrik-api/errors.ts:64` converte o status 401 no erro `unauthorized`.\n- `src/lib/biometrik-api/http.ts:108` chama `onUnauthorized` quando o erro é `unauthorized` e a request era autenticada. Sem token na sessão, a request falha como `unauthorized` sem ir à rede (`http.ts:94`).\n- `src/lib/biometrik-api/index.ts:43-55` repassa esse aviso aos ouvintes registrados por `onSessionRejected`.\n- `src/contexts/user/UserProvider.tsx:168` registra um ouvinte que chama `signOut()`.\n- Há duas exceções, ambas cobertas em `__tests__/client.test.ts:83-108`: `withToken` (`client.ts:24,51`) e o 401 do login não derrubam a sessão. O erro `unauthorized` ainda chega a quem chamou."
+ },
+ {
+  "id": "c05",
+  "type": "code",
+  "tools": {
+   "Grep": 1
+  },
+  "first_tool": "Grep",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 6.7,
+  "listed_cost_usd": 0.0755596,
+  "answer": "O usuário troca o idioma na tela de Perfil (`src/screens/Logged/Profile/index.tsx`).\n\n- Essa tela importa `changeLanguage` e `SUPPORTED_LANGUAGES` de `@i18n/index` (linha 21) e chama `changeLanguage(language)` na linha 48.\n- A função está em `src/i18n/index.ts:77`. Ela chama `i18n.changeLanguage(language)` e, na linha 79, aplica a troca em tempo de execução.\n\nSó li as linhas dessas buscas. Não abri o arquivo do Perfil para ver o componente visual do seletor."
+ },
+ {
+  "id": "c10",
+  "type": "code",
+  "tools": {
+   "Grep": 2,
+   "Read": 2
+  },
+  "first_tool": "Grep",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 10.6,
+  "listed_cost_usd": 0.10182930000000001,
+  "answer": "O erro da API vira uma `ApiError` com um `kind` (`network`, `unauthorized`, `server` etc.), classificado por `kindFromStatus` em `src/lib/biometrik-api/errors.ts:63`. O `message` dela é técnico e só serve para log.\n\nO texto que o usuário vê sai de `apiErrorText` em `src/utils/apiError.ts:12`:\n- `network` vira `t('errors:network')`.\n- `unauthorized` vira `t('errors:session_expired')`.\n- Qualquer outro caso usa o `fallback` que a própria tela passa, já traduzido com `t(...)`. Esse texto não vem do servidor, porque a API responde em inglês.\n\nExiste também `getApiErrorMessage` (`errors.ts:77`), que devolve o `serverMessage` da API ou o fallback. Pelo grep, nenhuma tela usa essa função: só aparece no teste `client.test.ts`."
+ },
+ {
+  "id": "s01",
+  "type": "symbol",
+  "tools": {
+   "mcp__code-memory__find_symbol": 1
+  },
+  "first_tool": "mcp__code-memory__find_symbol",
+  "used_mcp": true,
+  "cited": true,
+  "seconds": 4.3,
+  "listed_cost_usd": 0.0811076,
+  "answer": "O hook `useUser` está definido em `src/contexts/user/useUser.tsx` (linhas 5–13).\n\n- Ele é reexportado por `src/contexts/user/index.ts`, então os importadores o usam via `@contexts/user`.\n- Quem usa: `src/contexts/data/DataProvider.tsx`, `src/routes/Router.tsx`, `src/hooks/useImageSources.ts` e várias telas em `src/screens/Logged/*` e `src/screens/Unlogged/*`, como `Login` e `Profile`."
+ },
+ {
+  "id": "d02",
+  "type": "docs",
+  "tools": {},
+  "first_tool": null,
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 3.1,
+  "listed_cost_usd": 0.0677127,
+  "answer": "A versão do `package.json` só muda no PR de promoção `develop` → `main`.\n\n- `AGENTS.md` (regras operacionais): o bump acontece só nesse PR; PRs de feature para `develop` **não** mexem em `version`, para evitar conflito de `package.json` entre features paralelas.\n- `.github/workflows/check-version.yml`: roda só em PR contra `main` e falha se `version` não mudar em relação a `main`."
+ },
+ {
+  "id": "m01",
+  "type": "memory",
+  "tools": {
+   "Grep": 1,
+   "mcp__code-memory__recall": 1
+  },
+  "first_tool": "Grep",
+  "used_mcp": true,
+  "cited": true,
+  "seconds": 8.5,
+  "listed_cost_usd": 0.14756350000000001,
+  "answer": "O Supabase é legado e está sendo removido porque criava **duas identidades de usuário desconectadas**. O Supabase Auth ficava separado da base real do produto, que é o Postgres/Prisma do `biometrik.pro`. Um cadastro feito no app nunca existia no produto de verdade (`docs/harness/features/mobile-auth-nextjs-integration/handoff.md`).\n\nHoje toda chamada de dados deve passar por `@biometrik/api`, e código novo não usa o Supabase (`docs/architecture/data-layer.md:146`, `REPOSITORY.md:32`). A feature `mobile-logged-writes-and-supabase-removal` migra as telas aos poucos, e o cliente `src/lib/supabase.ts` é removido por último (`docs/exec-plans/active/mobile-logged-writes-and-supabase-removal.md`).\n\nAinda dependem dele o login social, o histórico, as atividades e as notícias (`ARCHITECTURE.md:13-14`, `docs/harness/features/mobile-logged-writes-and-supabase-removal/progress.md`)."
+ },
+ {
+  "id": "m03",
+  "type": "memory",
+  "tools": {
+   "Read": 3,
+   "Grep": 1
+  },
+  "first_tool": "Read",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 9.1,
+  "listed_cost_usd": 0.1917121,
+  "answer": "O progresso de streak da home já está concluído: `home-streak-progress` está `passing` e `clean_state.completed`, com o PR #105 integrado na `develop` (`docs/harness/feature_list.json`, `docs/harness/features/home-streak-progress/clean-state.md`). Todos os itens do checklist estão marcados.\n\nRestam só pendências periféricas, que `docs/harness/features/home-streak-progress/handoff.md` lista:\n- Alinhar a tela de detalhes do mesociclo a `homeProgress`, porque ela ainda usa a posição fixa semana 1, dia 1 vinda do servidor.\n- Remover `EXPO_PUBLIC_DEV_LOGIN_*` do `.env` local antes de ir às lojas. Os builds de loja já ignoram essas variáveis.\n\nO handoff ainda diz \"in_progress... falta o PR\", o que está desatualizado em relação ao `clean-state.md`. Não li as linhas 713 a 1029 do `feature_list.json`, então não sei se há outra feature de streak ali."
+ },
+ {
+  "id": "m05",
+  "type": "memory",
+  "tools": {
+   "Grep": 3,
+   "Read": 1
+  },
+  "first_tool": "Grep",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 10.6,
+  "listed_cost_usd": 0.0944714,
+  "answer": "Não, ainda não foi implementada. Está só planejada.\n\n- `docs/harness/feature_list.json:915-926`: a feature `app-training-photo-proof` está com `status: \"planned\"`, `branch: null` e `pull_request: null`.\n- `docs/harness/features/app-training-photo-proof/progress.md`: o estado é \"`planned`, aguardando ativação\" e todos os itens de entrega estão desmarcados. Os itens são foto no fim do treino, progresso da comprovação, crédito de geração grátis e textos nos dois idiomas.\n- `docs/exec-plans/backlog/app-training-photo-proof.md`: o plano ainda está em `backlog`, não em `active`.\n\nNão procurei no código-fonte em `src/` se há algum trecho avulso dessa funcionalidade."
+ },
+ {
+  "id": "n01",
+  "type": "no_answer",
+  "tools": {
+   "Grep": 3
+  },
+  "first_tool": "Grep",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 11.7,
+  "listed_cost_usd": 0.096827,
+  "answer": "O app não processa pagamentos com cartão de crédito. Não encontrei nenhum código de pagamento em `src/` nem em `package.json`: não há SDK de pagamento, tela de checkout ou fluxo de cobrança.\n\n- As únicas ocorrências de \"subscription\" em `src/screens/Logged/Player/ExercisePage/index.tsx` e `src/components/Video/index.tsx` são listeners do player de vídeo (`player.addListener`), sem relação com assinatura paga.\n- Pelo `AGENTS.md`, toda chamada de dados passa por `@biometrik/api` (`src/lib/biometrik-api/`), a API do `biometrik.pro`. Se houver cobrança, ela ficaria no webapp e na API, não neste repositório.\n\nProcurei por palavras-chave (`stripe`, `payment`, `checkout`, `cartão` e similares). Não li `src/lib/biometrik-api/` arquivo por arquivo."
+ }
+]

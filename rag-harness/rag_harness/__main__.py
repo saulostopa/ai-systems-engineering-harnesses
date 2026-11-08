@@ -1,10 +1,13 @@
 """POC CLI — agentic indexing and retrieval.
 
 Usage:
-    python -m rag_harness index <dir> [--verbose]
-    python -m rag_harness query <dir> "<query>" [--top-k N]
-    python -m rag_harness agent <dir> "<query>"
-    python -m rag_harness hybrid <dir> "<query>"
+    python -m rag_harness index <dir> [--profile default|docs|code] [--verbose]
+    python -m rag_harness query <dir> "<query>" [--profile P] [--top-k N]
+    python -m rag_harness agent <dir> "<query>" [--profile P]
+    python -m rag_harness hybrid <dir> "<query>" [--profile P]
+
+`--profile` selects the file extensions and the index folder:
+`default` -> <dir>/.rag_index, `docs`/`code` -> <dir>/.rag_index/<profile>.
 """
 
 from __future__ import annotations
@@ -16,12 +19,9 @@ import sys
 from .agentic import AgentController, pretty
 from .embeddings import make_embedder
 from .eval import load_queries
-from .indexer import index_dir, load_index
+from .indexer import PROFILES, index_dir, index_path_for, load_index
 from .retrieval import hybrid_search, lexical_search
-
-
-def _index_dir_for(root: str) -> str:
-    return os.path.join(root, ".rag_index")
+from .usage import usage_context
 
 
 def main() -> None:
@@ -31,20 +31,24 @@ def main() -> None:
     p_index = sub.add_parser("index")
     p_index.add_argument("root")
     p_index.add_argument("--verbose", action="store_true")
+    p_index.add_argument("--profile", choices=sorted(PROFILES), default="default")
 
     p_query = sub.add_parser("query")
     p_query.add_argument("root")
     p_query.add_argument("text")
     p_query.add_argument("--top-k", type=int, default=5)
+    p_query.add_argument("--profile", choices=sorted(PROFILES), default="default")
 
     p_hybrid = sub.add_parser("hybrid")
     p_hybrid.add_argument("root")
     p_hybrid.add_argument("text")
     p_hybrid.add_argument("--top-k", type=int, default=5)
+    p_hybrid.add_argument("--profile", choices=sorted(PROFILES), default="default")
 
     p_agent = sub.add_parser("agent")
     p_agent.add_argument("root")
     p_agent.add_argument("text")
+    p_agent.add_argument("--profile", choices=sorted(PROFILES), default="default")
 
     p_eval = sub.add_parser("eval")
     p_eval.add_argument("root")
@@ -54,6 +58,12 @@ def main() -> None:
     args = ap.parse_args()
     embedder = make_embedder()
     print(f"embedder: {type(embedder).__name__}")
+    # Ledger lines (when harness-usage is present) belong to the target repository.
+    with usage_context(project_root=os.path.abspath(args.root)):
+        _run(args, embedder)
+
+
+def _run(args, embedder) -> None:
 
     if args.cmd == "eval":
         from .eval import run_eval
@@ -70,11 +80,11 @@ def main() -> None:
         return
 
     if args.cmd == "index":
-        index = index_dir(args.root, embedder, verbose=args.verbose)
-        print(f"OK: {len(index.chunks)} chunks in {_index_dir_for(args.root)}")
+        index = index_dir(args.root, embedder, verbose=args.verbose, profile=args.profile)
+        print(f"OK: {len(index.chunks)} chunks in {index_path_for(args.root, args.profile)}")
         return
 
-    idx_dir = _index_dir_for(args.root)
+    idx_dir = index_path_for(args.root, args.profile)
     if not os.path.exists(idx_dir):
         print(f"ERROR: index does not exist in {idx_dir} — run 'index' first", file=sys.stderr)
         sys.exit(1)

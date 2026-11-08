@@ -8,8 +8,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 FLAG=".harness/skip-gatekeeper"
+
+# mtime in epoch seconds. GNU first (Linux), then BSD (macOS); GNU must go first
+# because GNU `stat -f` means --file-system and would print filesystem info.
+# If neither works, 0 makes the flag read as expired.
+mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
+}
+
 if [ -f "$FLAG" ]; then
-  AGE=$(( $(date +%s) - $(stat -c %Y "$FLAG") ))
+  AGE=$(( $(date +%s) - $(mtime "$FLAG") ))
   if [ "$AGE" -lt 300 ]; then
     echo "[gatekeeper] temporary bypass active ($(( 300 - AGE ))s left)"
     exit 0

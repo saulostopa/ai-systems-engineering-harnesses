@@ -19,11 +19,16 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Tests never write to the real usage ledger unless a test enables it.
+os.environ.setdefault("HARNESS_USAGE", "0")
+# Never pick up the developer's real OpenRouter key (that would bill).
+os.environ["OPENROUTER_AUTH_FILE"] = os.devnull
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 
 from hard_harness.core import Limits, Node, NodeInput, NodeKind, NodeOutput, Runner, WorkflowGraph  # noqa: E402
 from hard_harness.core.events import EventBus  # noqa: E402
-from hard_harness.core.gates import gate_from_command, gate_node_output  # noqa: E402
+from hard_harness.core.gates import gate_from_command, gate_jev_decision, gate_node_output  # noqa: E402
+
 from hard_harness.core.schemas import WorkflowStatus  # noqa: E402
 from hard_harness.stores import FileStateStore  # noqa: E402
 from hard_harness.llm.providers import StubProvider  # noqa: E402
@@ -111,7 +116,27 @@ def test_gate_passa_com_exit_zero():
     assert state.data["build"]["gate"]["passed"] is True
 
 
+def test_gate_jev_decision_bloqueia_e_passa():
+    # Pass path: score meets threshold
+    g_ok = WorkflowGraph(name="jev_gate_ok")
+    g_ok.add_node(Node("check", DET, gate_node_output("check", gate_jev_decision("check", "artifact_quality", min_score=0.85))))
+    g_ok.set_start("check")
+    state_ok = run(g_ok)
+    assert state_ok.status is WorkflowStatus.CLOSED
+    assert state_ok.data["check"]["gate"]["passed"] is True
+
+    # Block path: score below threshold
+    g_fail = WorkflowGraph(name="jev_gate_fail")
+    fail_gate = gate_jev_decision("check", "artifact_quality", min_score=0.85, evaluator=lambda p: (False, 0.60, "score 0.60 below 0.85"))
+    g_fail.add_node(Node("check", DET, gate_node_output("check", fail_gate)))
+    g_fail.set_start("check")
+    state_fail = run(g_fail, Limits(max_retries=0))
+    assert state_fail.status is WorkflowStatus.FAILED
+    assert "MAX_RETRIES" in state_fail.error
+
+
 # ═══ Fan-out and join ═══════════════════════════════════════════════
+
 
 def test_fanout_e_join():
     g = WorkflowGraph(name="fanjoin")
@@ -386,6 +411,25 @@ def test_exemplo_completo_fecha_com_evidencia():
         assert state.data["evidence"]["passed"] is True
         assert len(result["store"].list_events()) >= 15  # full trail
 
+
+
+def test_contexto_do_ledger_chega_ao_no_com_timeout():
+    from hard_harness import usage
+
+    if usage._usage is None:
+        return  # standalone copy without harness-usage
+    seen: dict = {}
+
+    def fn(ninput: NodeInput) -> NodeOutput:
+        seen.update(usage._usage.current_context())
+        return NodeOutput(node_id="a", ok=True, payload={})
+
+    g = WorkflowGraph(name="ctx")
+    g.add_node(Node("a", DET, fn, timeout_s=5))
+    g.set_start("a")
+    state = run(g)
+    assert seen["operation"] == "a"
+    assert seen["request_id"] == state.workflow_id
 
 if __name__ == "__main__":
     import traceback

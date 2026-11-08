@@ -101,3 +101,41 @@ def gate_scope_valid(payload: dict[str, object]) -> GateResult:
         node_id="gate.scope",
     )
     return GateResult(node_id="gate.scope", passed=not failures, failures=failures, evidence=[ev])
+
+
+def gate_jev_decision(
+    node_id: str,
+    check_name: str,
+    min_score: float = 0.85,
+    evaluator: Callable[[dict[str, object]], tuple[bool, float, str]] | None = None,
+) -> GateFn:
+    """Jev-powered typed decision gate (Lesson 18 / Jev 4 pillars).
+
+    Evaluates structured artifacts using typed scoring/confidence before
+    allowing transitions in the executable graph. Fails closed if score < min_score.
+    """
+
+    def gate(payload: dict[str, object]) -> GateResult:
+        if evaluator is None:
+            score = float(payload.get("score", 1.0))
+            passed = score >= min_score
+            reason = "meets threshold" if passed else f"score {score:.2f} below {min_score:.2f}"
+        else:
+            passed, score, reason = evaluator(payload)
+
+        ev = Evidence(
+            kind="jev_decision",
+            command=f"gate_jev_decision({check_name}, min_score={min_score})",
+            expected=f">={min_score}",
+            actual=f"{score:.2f} ({reason})",
+            passed=passed,
+            node_id=node_id,
+        )
+        failures = (
+            []
+            if passed
+            else [{"check": check_name, "expected": f">={min_score}", "actual": f"{score:.2f} ({reason})"}]
+        )
+        return GateResult(node_id=node_id, passed=passed, failures=failures, evidence=[ev])
+
+    return gate

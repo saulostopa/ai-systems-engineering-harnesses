@@ -11,6 +11,7 @@ Principles (course requirements):
 
 from __future__ import annotations
 
+import contextvars
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import Any, Callable
 from .events import Event, EventBus
 from .graph import Node, WorkflowGraph
 from .schemas import NodeInput, NodeOutput, NodeKind, WorkflowState, WorkflowStatus
+from ..usage import usage_context
 
 
 @dataclass
@@ -137,12 +139,14 @@ class Runner:
         payload = state.data.get(node.id, {})
         ninput = NodeInput(node_id=node.id, state=state, payload=payload)
         fn = self.node_dispatch.get(node.id, node.fn)
-        if node.timeout_s > 0:
-            return self._run_with_timeout(fn, ninput, node.timeout_s)
-        try:
-            return fn(ninput)
-        except Exception as exc:
-            return NodeOutput(node_id=node.id, ok=False, error=f"{type(exc).__name__}: {exc}")
+        # Ledger lines of this node carry the node id and the workflow id.
+        with usage_context(operation=node.id, request_id=state.workflow_id):
+            if node.timeout_s > 0:
+                return self._run_with_timeout(fn, ninput, node.timeout_s)
+            try:
+                return fn(ninput)
+            except Exception as exc:
+                return NodeOutput(node_id=node.id, ok=False, error=f"{type(exc).__name__}: {exc}")
 
     @staticmethod
     def _run_with_timeout(fn: Callable[[NodeInput], NodeOutput], ninput: NodeInput, timeout_s: float) -> NodeOutput:
@@ -156,7 +160,8 @@ class Runner:
             except Exception as exc:
                 result["error"] = f"{type(exc).__name__}: {exc}"
 
-        thread = threading.Thread(target=target, daemon=True)
+        context = contextvars.copy_context()
+        thread = threading.Thread(target=context.run, args=(target,), daemon=True)
         thread.start()
         thread.join(timeout_s)
         if thread.is_alive():

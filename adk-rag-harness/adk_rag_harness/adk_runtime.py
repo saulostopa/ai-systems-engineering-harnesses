@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .usage import start_request
 from .workflow import AdkRagWorkflow, WorkflowResult
 
 
@@ -64,14 +65,26 @@ class AdkRuntimeAdapter:
             name=self.config.agent_name,
             description=self.config.description,
             instruction=(
-                "Use the run_workflow tool for every request that may need "
-                "repository or external evidence. Treat its status, confidence, "
-                "and evidence as authoritative. If status is clarify or blocked, "
-                "ask for clarification or explain that evidence is insufficient. "
-                "When status is retrieved, cite the returned source values."
+                "Call the run_workflow tool first for every user message, "
+                "greetings included: the workflow, not you, decides whether "
+                "evidence is needed. Treat its status, confidence, and evidence "
+                "as authoritative. If status is direct, answer without citing "
+                "sources. If status is clarify or blocked, ask for clarification "
+                "or explain that evidence is insufficient. When status is "
+                "retrieved, cite the returned source values, and say the lines "
+                "may have moved when an evidence item is stale. If action_gate is "
+                "confirm or human_review, say the answer needs human confirmation."
             ),
             tools=[self.run_workflow],
+            before_agent_callback=self._start_request,
         )
+
+    @staticmethod
+    def _start_request(callback_context: Any) -> None:
+        """Every ledger line of one user message shares the ADK invocation id."""
+
+        start_request(getattr(callback_context, "invocation_id", None))
+        return None
 
     def build_app(self) -> Any:
         """Wrap the agent in the ADK ``App`` container used by ADK runtimes."""
@@ -87,6 +100,9 @@ class AdkRuntimeAdapter:
             "confidence": result.confidence,
             "collection": result.collection,
             "strategy": result.strategy,
+            "model_tier": result.model_tier.value,
+            "action_gate": result.action_gate.value,
+            "guardrail_safe": result.guardrail_safe,
             "evidence": [
                 {
                     "source": chunk.source,
@@ -94,6 +110,7 @@ class AdkRuntimeAdapter:
                     "score": chunk.score,
                     "start_line": chunk.start_line,
                     "end_line": chunk.end_line,
+                    "stale": chunk.stale,
                 }
                 for chunk in result.chunks
             ],

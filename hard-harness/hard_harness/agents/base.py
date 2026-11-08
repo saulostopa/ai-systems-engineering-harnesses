@@ -6,7 +6,7 @@ Contract: run(NodeInput) -> NodeOutput.
   - They NEVER transition status.
 
 Injectable LLM provider (llm/providers.py): OpenRouter by default (env
-OPENROUTER_API_KEY), optional Ollama (OLLAMA_API_URL), offline Stub.
+OPENROUTER_API_KEY), optional Ollama (OLLAMA_BASE_URL), offline Stub.
 The cost (provider usage) travels in the payload as `llm_cost` — the runner
 applies the budget (Limits.llm_budget).
 """
@@ -35,7 +35,11 @@ class BaseAgent:
         """Attaches the provider cost (usage) to the payload — the runner decides the budget."""
         usage = getattr(self.provider, "last_usage", None)
         tokens = usage.total if usage else 0
-        return {"llm_cost": float(tokens) / 1000.0 if tokens else 1.0, "llm_tokens": tokens}
+        return {
+            "llm_cost": float(tokens) / 1000.0 if tokens else 1.0,
+            "llm_tokens": tokens,
+            "llm_cost_usd": getattr(self.provider, "last_cost_usd", None),
+        }
 
     def run(self, ninput: NodeInput) -> NodeOutput:
         raise NotImplementedError

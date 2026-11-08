@@ -1,0 +1,165 @@
+[
+ {
+  "id": "c01",
+  "type": "code",
+  "tools": {
+   "run_command": 1
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 4.4,
+  "tokens": 29643,
+  "denied": [
+   {
+    "action": "command",
+    "display_name": "RunCommand"
+   }
+  ],
+  "answer": ""
+ },
+ {
+  "id": "c02",
+  "type": "code",
+  "tools": {
+   "run_command": 3,
+   "read_file": 4
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 42.9,
+  "tokens": 27401,
+  "denied": null,
+  "answer": "1. Em chamadas autenticadas, o 401 é interceptado e transformado em [`ApiError`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/errors.ts#L62-L68) com tipo `'unauthorized'` em [`src/lib/biometrik-api/http.ts`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/http.ts#L107-L110).\n2. O cliente HTTP aciona o callback `onUnauthorized`, notificando os ouvintes registrados em [`src/lib/biometrik-api/index.ts`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/index.ts#L54-L58).\n3. O [`UserProvider`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/contexts/user/UserProvider.tsx#L167-L170) escuta esse aviso via [`onSessionRejected`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/index.ts#L43-L48) e invoca a função `signOut()`.\n4. O estado de usuário, sessão e o [`sessionToken`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/index.ts#L38) são limpos, deslogando o usuário no app.\n5. A chamada original da API tem sua Promise rejeitada lançando o [`ApiError`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/lib/biometrik-api/http.ts#L109).\n"
+ },
+ {
+  "id": "c05",
+  "type": "code",
+  "tools": {
+   "run_command": 1,
+   "read_file": 1
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 15.9,
+  "tokens": 10203,
+  "denied": null,
+  "answer": "O usuário troca o idioma na tela de **Perfil** do app.\nA opção fica no seletor `<Select>` de idioma em [`Profile/index.tsx`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/screens/Logged/Profile/index.tsx#L270-L278), que oferece as opções **Português** (`pt-BR`) e **English** (`en-US`).\nA alteração é persistida e aplicada instantaneamente pela função [`changeLanguage`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/i18n/index.ts#L77-L80).\n"
+ },
+ {
+  "id": "c10",
+  "type": "code",
+  "tools": {
+   "run_command": 1
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 13.1,
+  "tokens": 3432,
+  "denied": [
+   {
+    "action": "command",
+    "display_name": "RunCommand"
+   }
+  ],
+  "answer": ""
+ },
+ {
+  "id": "s01",
+  "type": "symbol",
+  "tools": {
+   "run_command": 1
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 9.1,
+  "tokens": 6077,
+  "denied": null,
+  "answer": "O hook [`useUser`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/contexts/user/useUser.tsx#L5-L13) está definido no arquivo [useUser.tsx](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/contexts/user/useUser.tsx).\nEle consome o `UserContext` e também é reexportado como ponto central de entrada em [index.ts](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/contexts/user/index.ts#L3).\n"
+ },
+ {
+  "id": "d02",
+  "type": "docs",
+  "tools": {},
+  "first_tool": null,
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 7.4,
+  "tokens": 3796,
+  "denied": null,
+  "answer": "A versão do `package.json` deve ser alterada **exclusivamente no PR de promoção da branch `develop` para a `main`**.\nPRs de feature para `develop` **nunca** devem alterar a versão, evitando conflitos entre features paralelas.\nEssa diretriz está estabelecida no arquivo [`AGENTS.md`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/AGENTS.md).\nA regra é validada pelo workflow [`.github/workflows/check-version.yml`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/.github/workflows/check-version.yml), que roda apenas em PRs contra a `main` e falha se a versão não tiver mudado.\n"
+ },
+ {
+  "id": "m01",
+  "type": "memory",
+  "tools": {
+   "run_command": 1,
+   "read_file": 2
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 22.4,
+  "tokens": 13500,
+  "denied": null,
+  "answer": "O Supabase está sendo removido porque o backend do `biometrik.pro` possui sistema próprio de identidade e banco de dados (Prisma/Postgres com JWT), independente do Supabase Auth. Antes, usuários cadastrados via Supabase não existiam na base real do produto (onde ficam treinos e mesociclos) e vice-versa. Por isso, a arquitetura foi padronizada para consumir exclusivamente a API oficial via `@biometrik/api`.\n\nFonte: [`docs/exec-plans/completed/mobile-auth-nextjs-integration.md`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/docs/exec-plans/completed/mobile-auth-nextjs-integration.md#L13-L22) (linhas 13–22) e [`docs/architecture/data-layer.md`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/docs/architecture/data-layer.md).\n"
+ },
+ {
+  "id": "m03",
+  "type": "memory",
+  "tools": {
+   "read_file": 5,
+   "run_command": 1
+  },
+  "first_tool": "read_file",
+  "used_mcp": false,
+  "cited": true,
+  "seconds": 43.4,
+  "tokens": 20499,
+  "denied": null,
+  "answer": "**Nada está pendente**: a feature do progresso de streak já foi 100% concluída (`passing`) e integrada na branch `develop` via PR #105.\nTodos os requisitos (foguinho dinâmico, card de progresso, anel no avatar, persistência e i18n) estão validados em [`docs/harness/features/home-streak-progress/clean-state.md`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/docs/harness/features/home-streak-progress/clean-state.md).\nO encerramento e observações de entrega constam em [`docs/harness/features/home-streak-progress/handoff.md`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/docs/harness/features/home-streak-progress/handoff.md) e [`docs/harness/feature_list.json`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/docs/harness/feature_list.json).\nA implementação ativa de cálculo e interface reside em [`src/utils/homeProgress.ts`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/utils/homeProgress.ts) e [`src/screens/Logged/FeedTab/index.tsx`](file:///Users/saulostopa/Sites/projects/ps/biometrik-app-reactnative/src/screens/Logged/FeedTab/index.tsx).\n"
+ },
+ {
+  "id": "m05",
+  "type": "memory",
+  "tools": {
+   "read_file": 3,
+   "run_command": 2
+  },
+  "first_tool": "read_file",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 23.4,
+  "tokens": 14555,
+  "denied": [
+   {
+    "action": "command",
+    "display_name": "RunCommand"
+   }
+  ],
+  "answer": ""
+ },
+ {
+  "id": "n01",
+  "type": "no_answer",
+  "tools": {
+   "run_command": 1
+  },
+  "first_tool": "run_command",
+  "used_mcp": false,
+  "cited": false,
+  "seconds": 5.6,
+  "tokens": 3398,
+  "denied": [
+   {
+    "action": "command",
+    "display_name": "RunCommand"
+   }
+  ],
+  "answer": ""
+ }
+]

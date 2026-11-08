@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Callable
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -16,6 +17,7 @@ from .contracts import (
     DecisionResult,
     QuestionType,
 )
+from .usage import record_decision
 
 
 JsonTransport = Callable[[dict[str, Any]], dict[str, Any]]
@@ -120,19 +122,34 @@ class JevDecisionProvider:
             "model": self.model,
             "questions": {question.name: self._serialize_question(question) for question in questions},
         }
+        started = time.monotonic()
         try:
             response = self.transport(payload)
-        except DecisionProviderError:
-            raise
-        except Exception as exc:  # injected transports must fail closed too
+        except Exception as exc:
+            record_decision(provider="typesafe", model=self.model, questions=questions, started=started, error=exc)
+            if isinstance(exc, DecisionProviderError):
+                raise
+            # injected transports must fail closed too
             raise DecisionProviderError(f"Jev transport failed: {exc}") from exc
-        if not isinstance(response, dict) or not isinstance(response.get("answers"), dict):
-            raise DecisionProviderError("Jev response is missing an answers object")
-        answers = {
-            question.name: self._normalize_answer(question.name, response["answers"].get(question.name))
-            for question in questions
-        }
-        usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+        usage = response.get("usage") if isinstance(response, dict) and isinstance(response.get("usage"), dict) else {}
+        routed_model = str(response.get("model")) if isinstance(response, dict) and response.get("model") else None
+        try:
+            if not isinstance(response, dict) or not isinstance(response.get("answers"), dict):
+                raise DecisionProviderError("Jev response is missing an answers object")
+            answers = {
+                question.name: self._normalize_answer(question.name, response["answers"].get(question.name))
+                for question in questions
+            }
+        except DecisionProviderError as exc:
+            record_decision(
+                provider="typesafe", model=self.model, questions=questions, started=started,
+                usage=usage, routed_model=routed_model, error=exc, invalid=True,
+            )
+            raise
+        record_decision(
+            provider="typesafe", model=self.model, questions=questions, started=started,
+            usage=usage, routed_model=routed_model,
+        )
         return DecisionResult(
             answers=answers,
             provider="jev",
