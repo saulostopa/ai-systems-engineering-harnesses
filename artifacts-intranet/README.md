@@ -6,7 +6,7 @@ artifacts-intranet/
 │   ├── __init__.py        # path setup (rag_harness engine)
 │   ├── indexer.py         # scans artifact dirs, indexes (HTML/MD/TXT) into rag_harness
 │   └── server.py          # stdlib server: / (UI) and /search?q= (JSON)
-├── index.html             # Eleanor UI (system.css v2 reused)
+├── index.html             # Intranet UI (system.css v2 reused)
 ├── tests/test_intranet.py # 3 tests
 └── README.md
 ```

@@ -56,7 +56,7 @@ harness distributions:
 
 The standalone `harness-basic` directory currently installs the core only;
 derived distributions may bundle this profile under `.agents/skills/`. Shared
-Eleanor assets belong in `.agents/skills/assets/`. `feature-archify` still
+Archify assets belong in `.agents/skills/assets/`. `feature-archify` still
 requires the third-party `archify` skill, which must pass `skill-guard` before
 installation.
 

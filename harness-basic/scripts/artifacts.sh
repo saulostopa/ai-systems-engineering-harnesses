@@ -104,7 +104,7 @@ if node "$ARCHIFY" deliver "$TYPE" "$SRC" "$OUT" --quality showcase >/dev/null 2
   # are overridable without touching the geometry the composition validator
   # just approved. Appending after delivery also means a theme bug can never
   # be mistaken for a diagram bug.
-  THEME="$(dirname "${BASH_SOURCE[0]}")/eleanor-theme.css"
+  THEME="$(dirname "${BASH_SOURCE[0]}")/archify-theme.css"
   if [ -f "$THEME" ]; then
     { printf '\n<style data-theme="eleanor">\n'; cat "$THEME"; printf '\n</style>\n'; } >> "$OUT"
     say "applied the Eleanor palette"

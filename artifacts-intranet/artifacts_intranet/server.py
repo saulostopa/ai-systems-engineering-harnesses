@@ -1,7 +1,7 @@
 """Intranet server — stdlib http.server.
 
 Routes:
-    GET /            → UI (index.html, Eleanor)
+    GET /            → UI (index.html, system theme)
     GET /search?q=…  → JSON: hybrid RAG results with cited sources
     GET /static/…    → assets (system.css)
 """

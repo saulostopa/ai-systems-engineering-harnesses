@@ -2,7 +2,7 @@
 """check-contrast.py — measure every colour token in an Archify theme overlay.
 
 A palette applied by hand is a palette nobody measured. This walks each block of
-eleanor-theme.css, resolves the colours against that block's own `--bg`, and
+archify-theme.css, resolves the colours against that block's own `--bg`, and
 fails when a token is below its floor.
 
 Two floors, on purpose:
@@ -12,7 +12,7 @@ Two floors, on purpose:
 Using one bar for both would be wrong in either direction — too lax for the
 labels a person has to read, too strict for the outline of a box.
 
-Usage: python3 scripts/check-contrast.py scripts/eleanor-theme.css
+Usage: python3 scripts/check-contrast.py scripts/archify-theme.css
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def blocks(css: str) -> list[tuple[str, dict[str, str]]]:
 
 
 def main() -> int:
-    path = sys.argv[1] if len(sys.argv) > 1 else "scripts/eleanor-theme.css"
+    path = sys.argv[1] if len(sys.argv) > 1 else "scripts/archify-theme.css"
     css = open(path, encoding="utf-8").read()
     failures = 0
     checked = 0
