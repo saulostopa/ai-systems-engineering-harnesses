@@ -98,7 +98,7 @@ The core Python suites, App Harness gate and portable skill-scanner checks run w
 
 ## Relationship to the course
 
-The course, explanations, architecture decisions, and bilingual documentation remain in [harness-plannig](https://github.com/svslwm/harness-plannig). This repository is the distribution surface for the runnable harness projects.
+The course, explanations, architecture decisions, and bilingual documentation remain in [ai-systems-engineering-course](https://github.com/saulostopa/ai-systems-engineering-course). This repository is the distribution surface for the runnable harness projects.
 
 ## License
 
