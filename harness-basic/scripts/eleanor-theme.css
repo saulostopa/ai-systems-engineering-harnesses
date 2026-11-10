@@ -42,21 +42,21 @@
   --text-faint: #8f8f97;
 
   --arrow: #72727a;
-  --arrow-emphasis: #e53858;
+  --arrow-emphasis: #3b82f6;
 
   /* Eleanor has one accent and a diagram needs several distinguishable
-     families. Red stays on the primary path; the rest are Eleanor greys and
+     families. Blue stays on the primary path; the rest are Eleanor greys and
      indigo, so nothing reads as a second brand colour. */
-  --frontend-fill: rgba(216, 31, 65, 0.18);
-  --frontend-stroke: #e53858;
-  --backend-fill: rgba(228, 87, 112, 0.14);
-  --backend-stroke: #e45770;
+  --frontend-fill: rgba(37, 99, 235, 0.18);
+  --frontend-stroke: #3b82f6;
+  --backend-fill: rgba(96, 165, 250, 0.14);
+  --backend-stroke: #60a5fa;
   --database-fill: rgba(118, 118, 180, 0.18);
   --database-stroke: #7676b4;
   --cloud-fill: rgba(162, 162, 169, 0.14);
   --cloud-stroke: #a2a2a9;
-  --security-fill: rgba(216, 31, 65, 0.24);
-  --security-stroke: #d81f41;
+  --security-fill: rgba(37, 99, 235, 0.24);
+  --security-stroke: #2563eb;
   --messagebus-fill: rgba(154, 154, 208, 0.12);
   --messagebus-stroke: #9a9ad0;
   --external-fill: rgba(38, 38, 41, 0.55);
@@ -89,18 +89,18 @@
   --text-faint: #66666e;
 
   --arrow: #72727a;
-  --arrow-emphasis: #d81f41;
+  --arrow-emphasis: #2563eb;
 
-  --frontend-fill: rgba(216, 31, 65, 0.1);
-  --frontend-stroke: #d81f41;
-  --backend-fill: rgba(216, 31, 65, 0.06);
-  --backend-stroke: #b01834;
+  --frontend-fill: rgba(37, 99, 235, 0.1);
+  --frontend-stroke: #2563eb;
+  --backend-fill: rgba(37, 99, 235, 0.06);
+  --backend-stroke: #1d4ed8;
   --database-fill: rgba(76, 76, 160, 0.1);
   --database-stroke: #4c4ca0;
   --cloud-fill: rgba(114, 114, 122, 0.1);
   --cloud-stroke: #5f5f67;
-  --security-fill: rgba(216, 31, 65, 0.14);
-  --security-stroke: #a3162f;
+  --security-fill: rgba(37, 99, 235, 0.14);
+  --security-stroke: #1e40af;
   --messagebus-fill: rgba(76, 76, 160, 0.07);
   --messagebus-stroke: #3b3b7d;
   --external-fill: rgba(228, 228, 234, 0.6);
