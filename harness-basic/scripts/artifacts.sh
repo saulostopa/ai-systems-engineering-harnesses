@@ -106,8 +106,8 @@ if node "$ARCHIFY" deliver "$TYPE" "$SRC" "$OUT" --quality showcase >/dev/null 2
   # be mistaken for a diagram bug.
   THEME="$(dirname "${BASH_SOURCE[0]}")/archify-theme.css"
   if [ -f "$THEME" ]; then
-    { printf '\n<style data-theme="eleanor">\n'; cat "$THEME"; printf '\n</style>\n'; } >> "$OUT"
-    say "applied the Eleanor palette"
+    { printf '\n<style data-theme="sstt">\n'; cat "$THEME"; printf '\n</style>\n'; } >> "$OUT"
+    say "applied the SSTT palette"
     # The artifact must still pass its own checks after being restyled.
     if node "$ARCHIFY" check "$OUT" >/dev/null 2>&1; then
       say "OK — still passes archify check with the brand applied"

@@ -13,12 +13,12 @@
  * it works and changes nothing — the artifact keeps rendering in archify's own
  * colours. Every preset/mode pair has to be named here.
  *
- * BOTH MODES: Eleanor is a two-mode system and the artifact has a working
+ * BOTH MODES: SSTT is a two-mode system and the artifact has a working
  * light/dark toggle. Shipping only the dark palette would turn that toggle into
  * a no-op, so light is defined too.
  *
  * Applied by scripts/artifacts.sh after `archify deliver`.
- * Source of truth for the tokens: webmotors.ds.eleanor.tokens.
+ * Source of truth for the tokens: sstt.design.tokens.
  */
 
 /* ═══ DARK — background #0a0a0c ═══ */
@@ -44,8 +44,8 @@
   --arrow: #72727a;
   --arrow-emphasis: #3b82f6;
 
-  /* Eleanor has one accent and a diagram needs several distinguishable
-     families. Blue stays on the primary path; the rest are Eleanor greys and
+  /* SSTT has one accent and a diagram needs several distinguishable
+     families. Blue stays on the primary path; the rest are SSTT greys and
      indigo, so nothing reads as a second brand colour. */
   --frontend-fill: rgba(37, 99, 235, 0.18);
   --frontend-stroke: #3b82f6;
