@@ -1,0 +1,23 @@
+# .harness/config.yaml — this repository's layer B binding.
+#
+# This is the whole footprint the enterprise harness leaves behind: which flow
+# the project follows and which engine version adopted it. Everything the
+# project knows about itself — scope, plans, evidence, state — is in the
+# repository, in the PR, reviewable. Delete the orchestrator from the machine
+# and nothing here is lost.
+name: {{NAME}}
+flow: {{FLOW}}
+engine_version: {{ENGINE}}
+
+# Paths layer B owns. The gate in scripts/validate-harness.sh reads these.
+exec_plans: docs/exec-plans
+state: .harness/state.json
+events: .harness/events.jsonl
+
+# E2E gate (Lesson 10). Fill these in and scripts/e2e-gate.sh starts blocking
+# frontend commits that carry no E2E test. Left empty, it fails open — a
+# project with no frontend pays nothing for it.
+qa:
+  frontend_paths: ""        # e.g. "src" or "src|app"
+  frontend_extensions: ""   # e.g. "tsx ts jsx js"
+  e2e_test_path: ""         # e.g. "e2e" or "tests/e2e"

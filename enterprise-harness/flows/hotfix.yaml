@@ -1,0 +1,20 @@
+# hotfix — a shorter flow for production incidents.
+# Shorter, not laxer: the evidence criterion survives, because the cost of a
+# wrong "it's fixed" is highest exactly here.
+name: hotfix
+description: Contain, fix, prove, close — for a production incident.
+
+steps:
+  - Record the symptom and the blast radius
+  - Contain (revert, flag or mitigation) before fixing
+  - Fix the root cause inside the declared scope
+  - Prove with a regression test that fails before the fix
+  - Close: record the incident in progress.md
+exit_criteria:
+  - regression test fails before the fix and passes after it
+  - build green
+  - evidence recorded with real command output
+
+# No artifacts on purpose. An incident should not wait for a diagram; the
+# follow-up improvement item is where the explaining gets done.
+artifacts: []

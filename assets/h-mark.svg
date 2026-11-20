@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-labelledby="title desc">
+  <title id="title">Harness Foundation</title>
+  <desc id="desc">Blue rounded square with a white H monogram</desc>
+  <rect width="32" height="32" rx="8" fill="#2563eb"/>
+  <path d="M8 6h5v7.5h6V6h5v20h-5v-7.5h-6V26H8z" fill="#fff"/>
+</svg>

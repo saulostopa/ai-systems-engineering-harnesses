@@ -1,0 +1,3 @@
+node_modules/
+.rag_index/
+__pycache__/

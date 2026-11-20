@@ -1,0 +1,25 @@
+{
+  "features": [
+    {
+      "id": "game-001",
+      "title": "Character: the Garage Mechanic (persona + narrative)",
+      "description": "Newbie player persona + 3-mission narrative arc introducing the game world.",
+      "status": "not_started",
+      "priority": 1
+    },
+    {
+      "id": "game-002",
+      "title": "Mechanic: vehicle tuning",
+      "description": "Customization loop (input -> performance rule -> visual feedback) with a coin economy.",
+      "status": "not_started",
+      "priority": 2
+    },
+    {
+      "id": "game-003",
+      "title": "Publication: interactive garage on Roblox",
+      "description": "Luau/Rojo build of the garage + coin Developer Products, with platform checklist.",
+      "status": "not_started",
+      "priority": 3
+    }
+  ]
+}

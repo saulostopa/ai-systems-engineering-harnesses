@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.rag_index/
+.intranet_index/
+.adk/
+node_modules/
+dist/
+build/
+*.egg-info/
+
+.area_index/
+.harness/

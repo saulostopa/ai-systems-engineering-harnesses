@@ -1,0 +1,32 @@
+[
+  {
+    "id": "direct-greeting",
+    "prompt": "Write a short greeting for a course participant.",
+    "decision_answers": [{"needs_retrieval": [false, 0.98]}],
+    "expected": {"status": "direct", "rag_calls": 0, "collection": "", "strategy": "", "source_required": false}
+  },
+  {
+    "id": "deployment-policy",
+    "prompt": "Find the deployment policy in the course documentation and summarize the evidence.",
+    "decision_answers": [
+      {"needs_retrieval": [true, 0.96]},
+      {"collection": ["docs", 0.94], "strategy": ["hybrid", 0.93]}
+    ],
+    "expected": {"status": "retrieved", "rag_calls": 1, "collection": "docs", "strategy": "hybrid", "source_required": true}
+  },
+  {
+    "id": "uncertain-routing",
+    "prompt": "Answer only when the repository evidence is sufficient; otherwise explain what is missing.",
+    "decision_answers": [{"needs_retrieval": [true, 0.42]}],
+    "expected": {"status": "clarify", "rag_calls": 0, "collection": "", "strategy": "", "source_required": false}
+  },
+  {
+    "id": "missing-rule",
+    "prompt": "Find the rule that does not exist in the repository.",
+    "decision_answers": [
+      {"needs_retrieval": [true, 0.96]},
+      {"collection": ["code", 0.94], "strategy": ["keyword", 0.93]}
+    ],
+    "expected": {"status": "blocked", "rag_calls": 1, "collection": "code", "strategy": "keyword", "source_required": false}
+  }
+]

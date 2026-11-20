@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adk-rag-postgres-harness"
+version = "0.1.0"
+description = "PostgreSQL and pgvector RAG reference harness"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+postgres = [
+    "mcp>=1.9,<2",
+    "psycopg[binary]>=3.2,<4",
+    "tree-sitter>=0.23,<1",
+    "tree-sitter-javascript>=0.23,<1",
+    "tree-sitter-typescript>=0.23,<1",
+]
+adk = ["google-adk>=2.0.0,<3.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]

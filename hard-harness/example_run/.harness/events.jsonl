@@ -1,0 +1,14 @@
+{"id": "evt_23504de3c3dc", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "init", "message": "workflow iniciado", "data": {"status": "running"}}
+{"id": "evt_1eeb073e9e48", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "boot", "message": "entrando em boot", "data": {"status": "running"}}
+{"id": "evt_2ce0bb5d1f84", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "load_scope", "message": "entrando em load_scope", "data": {"status": "running"}}
+{"id": "evt_064ae79e0af2", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "planner_agent", "message": "entrando em planner_agent", "data": {"status": "running"}}
+{"id": "evt_e9e72731ee2c", "ts": "2026-09-19T08:25:05-0300", "kind": "agent_proposal", "node_id": "planner_agent", "message": "proposta aceita: validate_plan", "data": {"proposed": "validate_plan"}}
+{"id": "evt_0a5d89efc7ff", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "entrando em validate_plan", "data": {"status": "running"}}
+{"id": "evt_4be36a2c6423", "ts": "2026-09-19T08:25:05-0300", "kind": "error", "node_id": "validate_plan", "message": "plano vazio do planner", "data": {"attempts": 1}}
+{"id": "evt_ba19d10424d3", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "retry 1/2", "data": {"status": "running"}}
+{"id": "evt_3250d59296d9", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "entrando em validate_plan", "data": {"status": "running"}}
+{"id": "evt_939528621f3c", "ts": "2026-09-19T08:25:05-0300", "kind": "error", "node_id": "validate_plan", "message": "plano vazio do planner", "data": {"attempts": 2}}
+{"id": "evt_1b79837977d3", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "retry 2/2", "data": {"status": "running"}}
+{"id": "evt_5ba861d9355b", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "entrando em validate_plan", "data": {"status": "running"}}
+{"id": "evt_fa3aa2614c1f", "ts": "2026-09-19T08:25:05-0300", "kind": "error", "node_id": "validate_plan", "message": "plano vazio do planner", "data": {"attempts": 3}}
+{"id": "evt_45c0928904ed", "ts": "2026-09-19T08:25:05-0300", "kind": "transition", "node_id": "validate_plan", "message": "MAX_RETRIES excedido em validate_plan (2)", "data": {"status": "failed"}}

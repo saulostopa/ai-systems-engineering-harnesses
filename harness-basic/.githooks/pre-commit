@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-commit — mechanical gates (Lessons 07, 09, 10).
+#
+# Both gates run; the first failure stops the commit. The E2E gate is
+# fail-open until `qa:` is filled in at .harness/config.yaml, so it costs
+# nothing in a project that has no frontend.
+set -uo pipefail
+HERE="$(dirname "$0")/.."
+
+"$HERE/scripts/gatekeeper.sh" || exit 1
+[ -x "$HERE/scripts/e2e-gate.sh" ] && { "$HERE/scripts/e2e-gate.sh" || exit 1; }
+exit 0

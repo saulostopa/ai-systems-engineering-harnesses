@@ -1,0 +1,17 @@
+[
+  {
+    "question": "qual a meta de vendas de julho da regiao sudeste",
+    "expected_fragment": "meta_vendas:1200000",
+    "top_k": 3
+  },
+  {
+    "question": "quantos veiculos vendidos em junho",
+    "expected_fragment": "veiculos_vendidos:340",
+    "top_k": 3
+  },
+  {
+    "question": "qual a regra de precificacao de seminovos",
+    "expected_fragment": "seminovos acima de 5 anos",
+    "top_k": 3
+  }
+]

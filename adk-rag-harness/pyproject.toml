@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adk-rag-harness"
+version = "0.1.0"
+description = "Typed decision and retrieval boundary for an ADK RAG harness"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+adk = ["google-adk>=2.0.0,<3.0.0"]
+adk-gcp = ["google-adk[gcp]>=2.0.0,<3.0.0"]
+# LiteLLM imports `mcp` for tool calls without declaring it as a dependency.
+openrouter = ["litellm>=1.84", "mcp>=1.0"]
+ollama = ["litellm>=1.84", "mcp>=1.0"]
+postgres = ["psycopg[binary]>=3.2,<4"]
+jev-sdk = ["typesafe-sdk>=0.7.1,<0.8.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+feature_planner = ["demo_repository/*.md"]

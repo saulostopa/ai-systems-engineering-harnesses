@@ -1,0 +1,293 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Uma pergunta no adk-rag-harness",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "caminho-feliz",
+        "label": "Pergunta com evidência",
+        "focus": [
+          "conversa_1",
+          "guardrail",
+          "precisa_evidencia",
+          "colecao_estrategia",
+          "busca_rag",
+          "conversa_2"
+        ],
+        "note": "Siga a pergunta até a resposta citando as fontes do repositório."
+      },
+      {
+        "id": "saidas-antecipadas",
+        "label": "Saídas antecipadas",
+        "focus": [
+          "guardrail",
+          "precisa_evidencia",
+          "colecao_estrategia",
+          "busca_rag",
+          "saida_inseguro",
+          "saida_direct",
+          "saida_clarify",
+          "saida_sem_evidencia"
+        ],
+        "note": "Cada decisão tem uma saída que para o fluxo antes da busca ou da resposta."
+      },
+      {
+        "id": "onde-o-jev-entra",
+        "label": "Onde o Jev entra",
+        "focus": [
+          "conversa_1",
+          "guardrail",
+          "precisa_evidencia",
+          "colecao_estrategia",
+          "conversa_2"
+        ],
+        "note": "Estes passos chamam um modelo; sem o Jev, outro modelo ocupa o mesmo lugar."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "conversa",
+      "label": "adk web · modelo de conversa"
+    },
+    {
+      "id": "decisoes",
+      "label": "Decisões tipadas (Jev)"
+    },
+    {
+      "id": "codigo",
+      "label": "Código determinístico"
+    },
+    {
+      "id": "saidas",
+      "label": "Saídas antecipadas",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "entrada",
+      "label": "Entrada",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "decisao",
+      "label": "Decisões tipadas",
+      "fromCol": 1,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "evidencia",
+      "label": "Evidência e resposta",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "conversa_1",
+    "guardrail",
+    "precisa_evidencia",
+    "colecao_estrategia",
+    "busca_rag",
+    "conversa_2"
+  ],
+  "nodes": [
+    {
+      "id": "conversa_1",
+      "lane": "conversa",
+      "col": 0,
+      "type": "cloud",
+      "label": "Pergunta",
+      "sublabel": "conversa chama run_workflow",
+      "tag": "jev-router",
+      "width": 182
+    },
+    {
+      "id": "guardrail",
+      "lane": "decisoes",
+      "col": 1,
+      "type": "security",
+      "label": "Guardrail",
+      "sublabel": "is_safe? · opcional",
+      "width": 182
+    },
+    {
+      "id": "precisa_evidencia",
+      "lane": "decisoes",
+      "col": 2,
+      "type": "backend",
+      "label": "Precisa de evidência?",
+      "sublabel": "needs_retrieval",
+      "width": 182
+    },
+    {
+      "id": "colecao_estrategia",
+      "lane": "decisoes",
+      "col": 3,
+      "type": "backend",
+      "label": "Coleção e estratégia",
+      "sublabel": "docs|code · hybrid",
+      "width": 182
+    },
+    {
+      "id": "busca_rag",
+      "lane": "codigo",
+      "col": 4,
+      "type": "database",
+      "label": "Busca no rag-harness",
+      "sublabel": "índice + embedding",
+      "width": 182
+    },
+    {
+      "id": "conversa_2",
+      "lane": "conversa",
+      "col": 5,
+      "type": "cloud",
+      "label": "Resposta",
+      "sublabel": "conversa cita as fontes",
+      "tag": "jev-router",
+      "width": 182
+    },
+    {
+      "id": "saida_inseguro",
+      "lane": "saidas",
+      "col": 1,
+      "type": "security",
+      "label": "blocked",
+      "sublabel": "entrada insegura",
+      "width": 182
+    },
+    {
+      "id": "saida_direct",
+      "lane": "saidas",
+      "col": 2,
+      "type": "messagebus",
+      "label": "direct ou clarify",
+      "sublabel": "sem busca",
+      "width": 182
+    },
+    {
+      "id": "saida_clarify",
+      "lane": "saidas",
+      "col": 3,
+      "type": "messagebus",
+      "label": "clarify",
+      "sublabel": "confiança < 0,60",
+      "width": 182
+    },
+    {
+      "id": "saida_sem_evidencia",
+      "lane": "saidas",
+      "col": 4,
+      "type": "security",
+      "label": "blocked",
+      "sublabel": "sem evidência",
+      "width": 182
+    }
+  ],
+  "edges": [
+    {
+      "id": "conversa-guardrail",
+      "from": "conversa_1",
+      "to": "guardrail",
+      "label": "run_workflow",
+      "variant": "emphasis",
+      "fromSide": "bottom"
+    },
+    {
+      "id": "guardrail-evidencia",
+      "from": "guardrail",
+      "to": "precisa_evidencia",
+      "label": "seguro",
+      "variant": "default",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "evidencia-colecao",
+      "from": "precisa_evidencia",
+      "to": "colecao_estrategia",
+      "label": "sim",
+      "variant": "default"
+    },
+    {
+      "id": "colecao-busca",
+      "from": "colecao_estrategia",
+      "to": "busca_rag",
+      "label": "≥ 0,60",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "busca-conversa",
+      "from": "busca_rag",
+      "to": "conversa_2",
+      "label": "evidência",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "guardrail-bloqueia",
+      "from": "guardrail",
+      "to": "saida_inseguro",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "evidencia-dispensa",
+      "from": "precisa_evidencia",
+      "to": "saida_direct",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "colecao-incerta",
+      "from": "colecao_estrategia",
+      "to": "saida_clarify",
+      "variant": "dashed",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "busca-vazia",
+      "from": "busca_rag",
+      "to": "saida_sem_evidencia",
+      "variant": "security",
+      "role": "error"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Onde o Jev entra",
+      "items": [
+        "Conversa e decisões usam typesafe/jev-router por padrão",
+        "Sem Jev: ollama, outro modelo do OpenRouter ou demo"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Gates em código",
+      "items": [
+        "Confiança ≥ 0,85 executa, ≥ 0,60 confirma, abaixo vai a humano",
+        "Falha do provedor de decisões vira blocked + human_review"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "O que aprender",
+      "items": [
+        "O modelo só preenche respostas tipadas; o código escolhe a rota",
+        "Toda saída antecipada volta ao modelo de conversa para explicar"
+      ]
+    }
+  ]
+}

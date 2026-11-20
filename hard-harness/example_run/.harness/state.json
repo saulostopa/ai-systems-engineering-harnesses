@@ -1,0 +1,32 @@
+{
+  "workflow_id": "wf_d9d4210d4c9c",
+  "status": "failed",
+  "current_node": "validate_plan",
+  "data": {
+    "scope": {
+      "what": "feature demo",
+      "why": "hard harness",
+      "out_of_scope": "nada"
+    },
+    "boot": {
+      "booted_at": true,
+      "scope": {}
+    },
+    "load_scope": {
+      "scope": {}
+    },
+    "planner_agent": {
+      "plan_steps": [],
+      "source": "llm:stub",
+      "llm_cost": 1.0,
+      "llm_tokens": 0
+    }
+  },
+  "retries": {
+    "validate_plan": 3
+  },
+  "llm_calls": 1,
+  "depth": 5,
+  "error": "MAX_RETRIES excedido em validate_plan (2)",
+  "updated_at": "2026-09-19T08:25:05-0300"
+}
