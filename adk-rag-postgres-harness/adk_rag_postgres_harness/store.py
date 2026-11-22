@@ -463,6 +463,8 @@ class PostgresStore:
         collection: str | None = None,
         top_k: int = 8,
         strategy: str = "hybrid",
+        *,
+        snapshot_connection=None,
     ) -> list[dict]:
         """Reciprocal rank fusion over the candidates of the chosen strategy."""
 
@@ -482,6 +484,11 @@ class PostgresStore:
                     LIMIT {CANDIDATES}
                 ) AS matched
         """
+        snapshot_columns = """
+            , c.id AS chunk_id, c.content_hash, c.content AS indexed_text,
+              (SELECT vector_dims(e.embedding) FROM embeddings e
+               WHERE e.content_hash = c.content_hash AND e.model = %(model)s) AS embedding_dimensions
+        """ if snapshot_connection is not None else ""
         sql = f"""
             WITH semantic AS ({semantic}),
             lexical AS ({lexical}),
@@ -495,6 +502,7 @@ class PostgresStore:
             )
             SELECT f.path, f.content_hash AS file_hash, c.collection, c.kind, c.name,
                    c.start_line, c.end_line, x.semantic_rank, x.lexical_rank, x.score::float AS score
+                   {snapshot_columns}
             FROM fused x
             JOIN chunks c ON c.id = x.id
             JOIN files f ON f.id = c.file_id
@@ -509,9 +517,37 @@ class PostgresStore:
             "top_k": top_k,
             "vector": vector_literal(query_embedding) if query_embedding is not None else None,
         }
-        with self.connect() as conn:
+        connection = (contextlib.nullcontext(snapshot_connection)
+                      if snapshot_connection is not None else self.connect())
+        with connection as conn:
             self._prepare_vector_scan(conn)
             return list(conn.execute(sql, params).fetchall())
+
+    def planning_snapshot(
+        self, project: str, query: str, query_embedding: list[float], model: str, top_k: int, *, code_slots: int = 0
+    ):
+        """Read evidence, vectors and the comparison corpus from one database snapshot."""
+        with self.connect() as conn:
+            conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+            found = conn.execute("SELECT id FROM projects WHERE name = %s", (project,)).fetchone()
+            if found is None:
+                raise ValueError("The Postgres project must be indexed before running the planner.")
+            project_id = found["id"]
+            stats = conn.execute(
+                """SELECT count(*) AS chunks, coalesce(sum(octet_length(content)), 0) AS utf8_bytes
+                   FROM chunks WHERE project_id = %s""",
+                (project_id,),
+            ).fetchone()
+            rows = self.search(project_id, query, query_embedding, model, top_k=top_k, snapshot_connection=conn)
+            if code_slots and sum(row["collection"] == "code" for row in rows) < code_slots:
+                code = self.search(
+                    project_id, query, query_embedding, model, collection="code",
+                    top_k=code_slots, snapshot_connection=conn,
+                )
+                code_ids = {row["chunk_id"] for row in code}
+                rest = [row for row in rows if row["chunk_id"] not in code_ids]
+                rows = (code + rest)[:top_k]
+        return stats, rows
 
     def semantic_plan(
         self,

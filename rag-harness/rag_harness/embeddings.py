@@ -109,12 +109,14 @@ class OllamaEmbedder:
             raise RuntimeError("Ollama unavailable")
         headers = {"Content-Type": "application/json"}
 
+        started = time.monotonic()
         # `/api/embed` is the current Ollama endpoint and accepts `input`.
         payload = json.dumps({"model": self.model, "input": text}).encode("utf-8")
         req = urllib.request.Request(f"{self.api_url}/api/embed", data=payload, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=30) as res:
                 data = json.loads(res.read())
+            self._record_embedding(started, data, 1)
             return data["embeddings"][0]
         except urllib.error.HTTPError as exc:
             if exc.code not in (404, 405):
@@ -125,7 +127,19 @@ class OllamaEmbedder:
         req = urllib.request.Request(f"{self.api_url}/api/embeddings", data=payload, headers=headers)
         with urllib.request.urlopen(req, timeout=30) as res:
             data = json.loads(res.read())
+        self._record_embedding(started, data, 1)
         return data["embedding"]
+
+    def _record_embedding(self, started: float, response: dict, items: int) -> None:
+        count = response.get("prompt_eval_count")
+        record(
+            component="embedding_query",
+            provider="ollama",
+            model=self.model,
+            input_tokens=count if type(count) is int and count >= 0 else None,
+            input_items=items,
+            latency_ms=round((time.monotonic() - started) * 1000),
+        )
 
     def embed_batch(self, texts: list[str], batch_size: int = 16, timeout_s: float = 300.0) -> list[list[float]]:
         """Send chunks in batches through `/api/embed`, which accepts a list."""
@@ -139,8 +153,10 @@ class OllamaEmbedder:
             req = urllib.request.Request(
                 f"{self.api_url}/api/embed", data=payload, headers={"Content-Type": "application/json"}
             )
+            started = time.monotonic()
             with urllib.request.urlopen(req, timeout=timeout_s) as res:
                 data = json.loads(res.read())
+            self._record_embedding(started, data, len(batch))
             vectors.extend(data["embeddings"])
         return vectors
 

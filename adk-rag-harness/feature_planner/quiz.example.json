@@ -1,0 +1,344 @@
+{
+  "title": {
+    "pt": "Quiz do planner",
+    "en": "Planner quiz"
+  },
+  "questions": [
+    {
+      "level": 1,
+      "category": "technical",
+      "stem": {
+        "pt": "Onde o ADK Web exibe o pacote de evidências?",
+        "en": "Where does ADK Web display the evidence bundle?"
+      },
+      "options": [
+        {
+          "pt": "Em State",
+          "en": "In State"
+        },
+        {
+          "pt": "Em Artifacts",
+          "en": "In Artifacts"
+        },
+        {
+          "pt": "Em Sessions",
+          "en": "In Sessions"
+        }
+      ],
+      "correct": 1,
+      "why": {
+        "pt": "A aba Artifacts lista os arquivos pelo nome; State informa o estado da publicação.",
+        "en": "The Artifacts tab lists the files by name. State shows the publication status."
+      },
+      "source": "adk-rag-harness/README.md · Run the Postgres evidence pilot"
+    },
+    {
+      "level": 1,
+      "category": "business",
+      "stem": {
+        "pt": "Ao mudar o filtro na lista de tarefas, para qual página a interface deve ir?",
+        "en": "When the task status filter changes, which page should the UI show?"
+      },
+      "options": [
+        {
+          "pt": "Primeira página dos resultados filtrados",
+          "en": "First page of the filtered results"
+        },
+        {
+          "pt": "Página atual dos resultados filtrados",
+          "en": "Current page of the filtered results"
+        },
+        {
+          "pt": "Última página com resultados",
+          "en": "Last page containing results"
+        }
+      ],
+      "correct": 0,
+      "why": {
+        "pt": "A regra de produto exige voltar à primeira página quando o filtro é alterado.",
+        "en": "The product rule requires resetting to the first page when the filter changes."
+      },
+      "source": "feature_planner/demo_repository/task-list.md"
+    },
+    {
+      "level": 1,
+      "category": "business",
+      "stem": {
+        "pt": "Quais usuários devem receber o resumo semanal?",
+        "en": "Which users should receive the weekly digest?"
+      },
+      "options": [
+        {
+          "pt": "Quem abriu recentemente a tela de preferências",
+          "en": "Users who recently opened the preferences page"
+        },
+        {
+          "pt": "Todo usuário com um endereço válido",
+          "en": "Every user with a valid email address"
+        },
+        {
+          "pt": "Quem ativou o resumo semanal",
+          "en": "Users who opted into the weekly digest"
+        }
+      ],
+      "correct": 2,
+      "why": {
+        "pt": "O job seleciona usuários que têm digest_enabled ativado.",
+        "en": "The job selects users with digest_enabled turned on."
+      },
+      "source": "feature_planner/demo_repository/notification-preferences.md"
+    },
+    {
+      "level": 2,
+      "category": "technical",
+      "stem": {
+        "pt": "Como conferir se o contexto preparado corresponde ao trecho recuperado?",
+        "en": "How can you confirm that prepared context matches the retrieved excerpt?"
+      },
+      "options": [
+        {
+          "pt": "Comparar o nome do modelo com o do índice",
+          "en": "Compare the model name with the index name"
+        },
+        {
+          "pt": "Comparar os hashes do texto por ID de evidência",
+          "en": "Compare text hashes by evidence ID"
+        },
+        {
+          "pt": "Comparar a contagem total de tokens",
+          "en": "Compare the total token count"
+        }
+      ],
+      "correct": 1,
+      "why": {
+        "pt": "O ID localiza o trecho. O hash confirma a correspondência exata do texto preparado.",
+        "en": "The ID identifies the excerpt. The hash confirms an exact match with the prepared text."
+      },
+      "source": "postgres-evidence.json · retrieved and model_attempts"
+    },
+    {
+      "level": 2,
+      "category": "technical",
+      "stem": {
+        "pt": "Qual regra o grafo valida antes de encaminhar a proposta à revisão?",
+        "en": "Which rule does the graph validate before sending the proposal to review?"
+      },
+      "options": [
+        {
+          "pt": "As dependências dos cortes são acíclicas",
+          "en": "Slice dependencies are acyclic"
+        },
+        {
+          "pt": "Os revisores já aceitaram a proposta",
+          "en": "The reviewers have already accepted the proposal"
+        },
+        {
+          "pt": "Cada corte usa uma coleção Postgres diferente",
+          "en": "Each slice uses a different Postgres collection"
+        }
+      ],
+      "correct": 0,
+      "why": {
+        "pt": "O validador rejeita ciclos e também confere se as citações existem na recuperação.",
+        "en": "The validator rejects cycles and also checks that cited IDs exist in the retrieval results."
+      },
+      "source": "feature_planner/workflow.py · validate_spec"
+    },
+    {
+      "level": 2,
+      "category": "business",
+      "stem": {
+        "pt": "Ao paginar uma lista já filtrada, o que deve acontecer com o status selecionado?",
+        "en": "What should happen to the selected status when paging through filtered results?"
+      },
+      "options": [
+        {
+          "pt": "O filtro deve ser aplicado somente na página inicial",
+          "en": "The filter should apply to the first page only"
+        },
+        {
+          "pt": "O filtro deve voltar para o valor padrão",
+          "en": "The filter should revert to its default value"
+        },
+        {
+          "pt": "O filtro deve continuar valendo nas próximas páginas",
+          "en": "The filter should keep applying on subsequent pages"
+        }
+      ],
+      "correct": 2,
+      "why": {
+        "pt": "A paginação deve preservar os filtros já selecionados.",
+        "en": "Pagination must preserve the filters already selected."
+      },
+      "source": "feature_planner/demo_repository/task-list.md"
+    },
+    {
+      "level": 3,
+      "category": "technical",
+      "stem": {
+        "pt": "Qual comparação sustenta a estimativa de economia de contexto?",
+        "en": "Which comparison underlies the estimate of context savings?"
+      },
+      "options": [
+        {
+          "pt": "Tempo do Postgres contra tempo do Ollama",
+          "en": "Postgres elapsed time against Ollama elapsed time"
+        },
+        {
+          "pt": "Tokens de saída no modelo local contra o pago",
+          "en": "Output tokens in the local versus hosted model"
+        },
+        {
+          "pt": "Corpus indexado contra trechos selecionados para o planner",
+          "en": "Indexed corpus against selected chunks for the planner"
+        }
+      ],
+      "correct": 2,
+      "why": {
+        "pt": "O relatório aplica o mesmo estimador de texto ao corpus e ao conjunto selecionado.",
+        "en": "The report uses the same text estimator for the full corpus and the selected excerpts."
+      },
+      "source": "token-usage.md · Economia estimada no contexto do planner"
+    },
+    {
+      "level": 3,
+      "category": "technical",
+      "stem": {
+        "pt": "O que a coluna API equivalente mede em uma chamada por assinatura?",
+        "en": "What does the API-equivalent column measure for a subscription call?"
+      },
+      "options": [
+        {
+          "pt": "Uma estimativa pela tarifa pública de API aplicada aos contadores",
+          "en": "An estimate using public API rates and the reported counts"
+        },
+        {
+          "pt": "A parcela já debitada da assinatura",
+          "en": "The amount already charged to the subscription"
+        },
+        {
+          "pt": "O preço contratado no gateway",
+          "en": "The price negotiated for the gateway"
+        }
+      ],
+      "correct": 0,
+      "why": {
+        "pt": "A tabela aplica tarifas de referência aos tokens e permite comparar execuções.",
+        "en": "The table applies reference rates to token counts so that runs can be compared."
+      },
+      "source": "token-usage.md · API equivalente"
+    },
+    {
+      "level": 3,
+      "category": "business",
+      "stem": {
+        "pt": "Que teste melhor confirma a entrega da preferência pelo resumo semanal?",
+        "en": "Which test best confirms that the weekly digest preference works?"
+      },
+      "options": [
+        {
+          "pt": "Observar o toggle ativo logo após clicar",
+          "en": "Observe the toggle right after clicking it"
+        },
+        {
+          "pt": "Checar a preferência após recarregar e a seleção no próximo job",
+          "en": "Check the preference after reload and the next job's recipient selection"
+        },
+        {
+          "pt": "Verificar a presença da rota de preferências na documentação",
+          "en": "Check that the preferences route exists in the documentation"
+        }
+      ],
+      "correct": 1,
+      "why": {
+        "pt": "A regra exige que a preferência persista e que o próximo envio respeite a escolha.",
+        "en": "The rule requires persisting the preference and honoring it in the next digest."
+      },
+      "source": "feature_planner/demo_repository/notification-preferences.md"
+    },
+    {
+      "level": 4,
+      "category": "technical",
+      "stem": {
+        "pt": "Qual evento permite ao router tentar um provedor alternativo?",
+        "en": "Which event allows the router to try a different provider?"
+      },
+      "options": [
+        {
+          "pt": "Erro de credencial no provedor principal",
+          "en": "Authentication failure at the primary provider"
+        },
+        {
+          "pt": "Resposta fora do esquema solicitado",
+          "en": "Output outside the requested schema"
+        },
+        {
+          "pt": "Rejeição de cota reconhecida pelo router",
+          "en": "Quota rejection recognized by the router"
+        }
+      ],
+      "correct": 2,
+      "why": {
+        "pt": "A troca de provedor depende do sinal de cota; os demais erros seguem seu tratamento específico.",
+        "en": "Provider failover is triggered by a quota signal. Other errors follow their own handling."
+      },
+      "source": "feature_planner/model_router.py · ModelRouter.attempts"
+    },
+    {
+      "level": 4,
+      "category": "business",
+      "stem": {
+        "pt": "Depois de limpar todos os filtros, qual resultado atende à regra de negócio?",
+        "en": "Which result meets the product rule after all filters are cleared?"
+      },
+      "options": [
+        {
+          "pt": "A lista volta a mostrar todos os status, sujeita à paginação",
+          "en": "The list shows every status again, subject to pagination"
+        },
+        {
+          "pt": "A lista preserva somente o último status filtrado",
+          "en": "The list shows only the last selected status"
+        },
+        {
+          "pt": "A lista fica vazia até o próximo filtro",
+          "en": "The list is empty until a filter is selected"
+        }
+      ],
+      "correct": 0,
+      "why": {
+        "pt": "Limpar filtros restaura a lista completa.",
+        "en": "Clearing filters restores the complete task list."
+      },
+      "source": "feature_planner/demo_repository/task-list.md"
+    },
+    {
+      "level": 4,
+      "category": "business",
+      "stem": {
+        "pt": "O plano foi aceito, mas o teste do próximo resumo semanal falhou. Qual estado devemos comunicar?",
+        "en": "The plan passed review, but the next digest test failed. What should we report?"
+      },
+      "options": [
+        {
+          "pt": "A entrega está aceita porque o toggle foi implementado",
+          "en": "The delivery passed because the toggle was implemented"
+        },
+        {
+          "pt": "O planejamento está aceito e a entrega aguarda o critério do envio",
+          "en": "The plan passed, and delivery still depends on satisfying the digest criterion"
+        },
+        {
+          "pt": "O envio foi validado durante a geração dos artefatos",
+          "en": "Digest delivery was validated when the artifacts were generated"
+        }
+      ],
+      "correct": 1,
+      "why": {
+        "pt": "A validação do plano confirma a proposta. A entrega ainda precisa cumprir o comportamento acordado no job.",
+        "en": "Plan validation checks the proposal. Delivery still needs to satisfy the agreed job behavior."
+      },
+      "source": "feature_planner/demo_repository/notification-preferences.md"
+    }
+  ]
+}
