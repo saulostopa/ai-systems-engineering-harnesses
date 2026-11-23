@@ -1,0 +1,90 @@
+{
+  "eval_set_id": "catalogo-adfixus-v1",
+  "name": "Catálogo AdFixus · regressão sintética v1",
+  "eval_cases": [
+    {
+      "eval_id": "consentimento-com-evidencia",
+      "conversation": [
+        {
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Planeje a integração sandbox do AdFixus com consentimento FIPE."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "**accepted** · A evidência sintética cobre a integração e o consentimento.\n\n- **consentimento** · Integrar o consentimento do AdFixus no Catálogo. (accept)\n  - A evidência sintética cobre a integração e o consentimento.\n  - A referência descreve o contrato de consentimento. (E2)"
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "feature_planner_evals",
+        "user_id": "synthetic-evals",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "adobe-sem-contrato-fipe",
+      "conversation": [
+        {
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Planeje a integração sandbox do AdFixus sem evidência de consentimento."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "**needs_review** · One or more slices did not pass verification.\n\n- **consentimento** · Integrar o consentimento do AdFixus no Catálogo. (reject)\n  - Falta evidência do contrato de consentimento da FIPE."
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "feature_planner_evals",
+        "user_id": "synthetic-evals",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "citacao-fora-do-escopo",
+      "conversation": [
+        {
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Planeje a integração sandbox do AdFixus com referência fora do escopo."
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "consentimento cites evidence outside the retrieval result."
+              }
+            ]
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "feature_planner_evals",
+        "user_id": "synthetic-evals",
+        "state": {}
+      }
+    }
+  ]
+}

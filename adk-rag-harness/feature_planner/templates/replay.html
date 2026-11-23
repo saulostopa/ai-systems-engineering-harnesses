@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Replay da execução</title>
+  <style>$css</style>
+</head>
+<body>
+<header class="masthead shell">
+  <span class="brand">Evidências do piloto</span>
+  <nav aria-label="Artefatos"><a href="architecture.html">Arquitetura</a><a href="replay.html" aria-current="page">Replay</a><a href="faq.html">FAQ</a><a href="quiz.html">Quiz</a></nav>
+</header>
+<main class="shell">
+  <section class="hero">
+    <div><h1>Replay da execução</h1><p>Acompanhe a recuperação, o planejamento e a revisão. Selecione um evento para examinar o contexto daquela etapa.</p></div>
+    <span class="status" data-tone="$tone">$status</span>
+  </section>
+  <section class="panel flow-panel" aria-labelledby="flow-title">
+    <div class="panel-title"><h2 id="flow-title">Fluxo do ADK</h2><small>$retrieval_summary</small></div>
+    <ol class="flow" id="flow">
+      <li class="flow-node" data-node="retrieval"><strong>$backend</strong><small>Recuperação</small></li>
+      <li class="flow-node" data-node="planner"><strong>Planejamento</strong><small>Proposta de cortes</small></li>
+      <li class="flow-node" data-node="slice_worker"><strong>Investigação</strong><small>Achados por corte</small></li>
+      <li class="flow-node" data-node="slice_verifier"><strong>Revisão dos cortes</strong><small>Evidências por corte</small></li>
+      <li class="flow-node" data-node="global_evaluator"><strong>Avaliação final</strong><small>Coerência do plano</small></li>
+      <li class="flow-node" data-node="result"><strong>Síntese</strong><small>Veredito do grafo</small></li>
+    </ol>
+    <div class="playback" id="controls" hidden>
+      <button class="control primary" id="play" type="button" aria-pressed="false">Reproduzir</button>
+      <button class="control" id="back" type="button">Voltar</button>
+      <button class="control" id="next" type="button">Avançar</button>
+      <button class="control" id="restart" type="button">Reiniciar</button>
+      <input class="track" id="track" type="range" min="0" value="0" aria-label="Evento da execução">
+      <output id="position" aria-live="polite"></output>
+    </div>
+    <noscript><p>Ative JavaScript para navegar e reproduzir a linha do tempo.</p></noscript>
+  </section>
+  <div class="replay-grid">
+    <section class="panel events-panel">
+      <div class="panel-title"><h2>Linha do tempo</h2><small>$event_count</small></div>
+      <ol class="timeline" id="timeline">$timeline</ol>
+    </section>
+    <section class="panel inspector" id="inspector" aria-labelledby="detail-title">
+      <div class="panel-title"><h2 id="detail-title">Detalhes do evento</h2><span id="detail-state" class="status" hidden></span></div>
+      <dl id="detail"></dl>
+    </section>
+  </div>
+  <footer class="foot">Execução <code>$invocation</code><a href="execution.json">Registro JSON</a><a href="postgres-evidence.json">Evidência de recuperação</a><a href="token-usage.md">Uso de tokens</a></footer>
+</main>
+<script type="application/json" id="event-data">$events</script>
+<script>$script</script>
+</body>
+</html>

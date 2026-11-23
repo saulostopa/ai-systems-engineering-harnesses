@@ -172,8 +172,9 @@ def record(
     provider: str,
     model: str,
     routed_model: str | None = None,
-    input_tokens: int = 0,
-    output_tokens: int = 0,
+    input_tokens: int | None = 0,
+    output_tokens: int | None = 0,
+    input_items: int | None = None,
     cached_tokens: int = 0,
     cost_usd: float | None = None,
     latency_ms: int | None = None,
@@ -203,8 +204,8 @@ def record(
             "provider": provider,
             "model": model,
             "routed_model": routed_model,
-            "input_tokens": int(input_tokens or 0),
-            "output_tokens": int(output_tokens or 0),
+            "input_tokens": int(input_tokens) if input_tokens is not None else None,
+            "output_tokens": int(output_tokens) if output_tokens is not None else None,
             "cached_tokens": int(cached_tokens or 0),
             "cost_usd": cost,
             "cost_source": source,
@@ -214,6 +215,8 @@ def record(
             "project": root.name,
             "feature": active_feature(root),
         }
+        if input_items is not None:
+            entry["input_items"] = input_items
         directory = ledger_dir(root)
         directory.mkdir(parents=True, exist_ok=True)
         path = ledger_file(directory, now)
@@ -235,7 +238,7 @@ def _cost(
         return float(cost_usd), "provider"
     if provider in LOCAL_PROVIDERS:
         return 0.0, "local"
-    if provider == "openrouter":
+    if provider == "openrouter" and input_tokens is not None and output_tokens is not None:
         estimated = price_cost(model, input_tokens, output_tokens)
         if estimated is not None:
             return estimated, "price_table"

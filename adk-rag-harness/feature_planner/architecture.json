@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Planejamento de features com ADK e Postgres",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 548]
+  },
+  "components": [
+    {"id": "web", "type": "frontend", "label": "ADK Web", "sublabel": "Solicitação e eventos", "pos": [70, 210], "size": [195, 80]},
+    {"id": "graph", "type": "backend", "label": "Grafo de planejamento", "sublabel": "Validação e dependências", "pos": [444, 210], "size": [230, 80]},
+    {"id": "postgres", "type": "database", "label": "Postgres + pgvector", "sublabel": "Chunks e embeddings", "pos": [854, 70], "size": [200, 80]},
+    {"id": "models", "type": "external", "label": "Provedores de modelos", "sublabel": "Planejar, investigar, revisar", "pos": [854, 210], "size": [200, 80]},
+    {"id": "evidence", "type": "backend", "label": "Pacote de evidências", "sublabel": "Artefatos da execução", "pos": [854, 350], "size": [200, 80]}
+  ],
+  "connections": [
+    {"id": "mission", "from": "web", "to": "graph", "label": "Solicitação"},
+    {"id": "chunk-search", "from": "graph", "to": "postgres", "label": "Busca híbrida"},
+    {"id": "role-request", "from": "graph", "to": "models", "label": "Contexto por etapa", "labelDy": 12},
+    {"id": "publish-evidence", "from": "graph", "to": "evidence", "label": "Publica artefatos"}
+  ]
+}

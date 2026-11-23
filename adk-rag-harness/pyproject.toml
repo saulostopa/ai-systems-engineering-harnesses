@@ -22,4 +22,5 @@ jev-sdk = ["typesafe-sdk>=0.7.1,<0.8.0"]
 where = ["."]
 
 [tool.setuptools.package-data]
-feature_planner = ["demo_repository/*.md"]
+feature_planner = ["demo_repository/*.md", "architecture.json", "model-router.example.json", "quiz.example.json", "templates/*"]
+feature_planner_evals = ["*.evalset.json", "test_config.json"]

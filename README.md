@@ -149,9 +149,10 @@ before indexing production repositories or configuring isolated worktrees.
 The `feature_planner` app is included in the repository's default checkout. It
 uses lexical RAG over a synthetic repository and Ollama structured
 output to generate a validated `WorkflowSpec`. Its explicit ADK graph reviews
-up to three vertical slices, runs at most two independent slices concurrently,
-skips dependants after a failed dependency, and allows one retry for a
-corrigible review. The read-only demo produces events, state, and a
+up to five vertical slices by default, runs up to two investigations concurrently,
+verifies each worker report in a separate call and synthesizes the results.
+The graph skips dependants after a failed dependency and allows one worker retry
+with reviewer feedback. The read-only demo produces events, state, and a
 `workflow-spec.json` artifact in the ADK Dev UI.
 
 Make sure Ollama is running and make the default `qwen2.5:14b` model available:
@@ -171,6 +172,9 @@ for each request. The lockfile resolves Google ADK 2.14.1 on Python 3.11+
 
 The app uses Ollama for both planning and verification. The separate
 `adk_app` can use Jev for question answering.
+
+See the [Postgres pilot setup](adk-rag-harness/README.md#run-the-postgres-evidence-pilot)
+to reuse one catalog checkout across several target repositories.
 
 ## How the pieces fit
 

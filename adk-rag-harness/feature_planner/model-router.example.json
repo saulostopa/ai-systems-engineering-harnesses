@@ -1,0 +1,20 @@
+{
+  "planner": [
+    {"provider": "claude-code", "model": "claude-opus-5-5", "effort": "high"},
+    {"provider": "codex", "model": "gpt-6-sol", "effort": "high"},
+    {"provider": "agy", "model": "gemini-3.8-flash-medium", "effort": "medium"},
+    {"provider": "ollama", "model": "qwen2.5:14b"}
+  ],
+  "slice_worker": [
+    {"provider": "ollama", "model": "qwen2.5:14b"}
+  ],
+  "slice_verifier": [
+    {"provider": "ollama", "model": "qwen2.5:14b"}
+  ],
+  "global_evaluator": [
+    {"provider": "claude-code", "model": "claude-sonnet-5-5", "effort": "medium"},
+    {"provider": "agy", "model": "gemini-3.8-flash-medium", "effort": "medium"},
+    {"provider": "codex", "model": "gpt-6-sol", "effort": "high"},
+    {"provider": "ollama", "model": "qwen2.5:14b"}
+  ]
+}
