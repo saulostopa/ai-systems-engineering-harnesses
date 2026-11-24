@@ -15,7 +15,7 @@ from urllib.parse import urlsplit, urlunsplit
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT))
 
-from adk_rag_postgres_harness.embeddings import EMBED_DIM
+from adk_rag_postgres_harness.embeddings import EMBED_DIM, embed_query, embedder_id
 from adk_rag_postgres_harness.ingest import MAX_FILE_BYTES, MAX_LINE_BYTES, sync
 from adk_rag_postgres_harness.retrieval import find_symbol, read_file, search_code, where_used
 from adk_rag_postgres_harness.store import PostgresStore, database_url
@@ -341,6 +341,35 @@ class SyncTests(unittest.TestCase):
         self._sync()
         hits = self._search("Where is addToCart defined?", collection="docs")
         self.assertNotIn("src/cart.ts", [hit.path for hit in hits])
+
+    def _planning(self, query: str, top_k: int, docs_top_k: int) -> list[dict]:
+        vector = embed_query(self.embedder, query)
+        model = embedder_id(self.embedder)
+        return self.store.planning_snapshot("shop", query, vector, model, top_k, docs_top_k=docs_top_k)[1]
+
+    def test_planning_keeps_code_places_when_documents_match_more_text(self):
+        for number in range(4):
+            self._write(f"docs/checkout-{number}.md", f"# Checkout {number}\n\n" + "The checkout flow, the cart and the login.\n" * 40)
+        self._sync()
+        query = "How do the cart and the login work in the checkout flow?"
+        project_id = self.store.project("shop")["id"]
+        vector = embed_query(self.embedder, query)
+        mixed = self.store.search(project_id, query, vector, embedder_id(self.embedder), top_k=3)
+        self.assertEqual([row["collection"] for row in mixed], ["docs", "docs", "docs"])
+
+        rows = self._planning(query, top_k=3, docs_top_k=1)
+        self.assertEqual(sorted(row["collection"] for row in rows), ["code", "code", "docs"])
+        self.assertEqual([row["score"] for row in rows], sorted((row["score"] for row in rows), reverse=True))
+
+    def test_planning_gives_unused_places_to_the_other_collection(self):
+        self._sync()
+        rows = self._planning("checkout flow", top_k=3, docs_top_k=2)
+        self.assertEqual(sorted(row["collection"] for row in rows), ["code", "code", "docs"])
+
+    def test_planning_rejects_a_docs_budget_over_the_size(self):
+        self._sync()
+        with self.assertRaises(ValueError):
+            self._planning("checkout flow", top_k=2, docs_top_k=3)
 
     def test_a_long_definition_is_cut(self):
         body = "".join(f"  step{number}();\n" for number in range(200))

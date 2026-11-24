@@ -70,6 +70,12 @@ def lexical_query(query: str) -> str:
     return " | ".join(f"'{term}'" for term in terms)
 
 
+def _by_score(row: dict) -> tuple:
+    """The order of `search`: score, then path and line."""
+
+    return -row["score"], row["path"], row["start_line"]
+
+
 @dataclass(frozen=True)
 class ChunkRow:
     kind: str
@@ -524,9 +530,16 @@ class PostgresStore:
             return list(conn.execute(sql, params).fetchall())
 
     def planning_snapshot(
-        self, project: str, query: str, query_embedding: list[float], model: str, top_k: int, *, code_slots: int = 0
+        self, project: str, query: str, query_embedding: list[float], model: str, top_k: int, *, docs_top_k: int = 0
     ):
-        """Read evidence, vectors and the comparison corpus from one database snapshot."""
+        """Read evidence, vectors and the comparison corpus from one database snapshot.
+
+        Code and documentation are ranked apart: ranked together, full text lifts long
+        documents above the code. `docs_top_k` places go to documentation and the rest to
+        code. A collection with too few results leaves its places to the other one.
+        """
+        if not 0 <= docs_top_k <= top_k:
+            raise ValueError("The documentation budget must be from 0 to the retrieval size.")
         with self.connect() as conn:
             conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             found = conn.execute("SELECT id FROM projects WHERE name = %s", (project,)).fetchone()
@@ -538,16 +551,18 @@ class PostgresStore:
                    FROM chunks WHERE project_id = %s""",
                 (project_id,),
             ).fetchone()
-            rows = self.search(project_id, query, query_embedding, model, top_k=top_k, snapshot_connection=conn)
-            if code_slots and sum(row["collection"] == "code" for row in rows) < code_slots:
-                code = self.search(
-                    project_id, query, query_embedding, model, collection="code",
-                    top_k=code_slots, snapshot_connection=conn,
+            quotas = {"code": top_k - docs_top_k, "docs": docs_top_k}
+            ranked = {
+                collection: self.search(
+                    project_id, query, query_embedding, model, collection=collection,
+                    top_k=top_k, snapshot_connection=conn,
                 )
-                code_ids = {row["chunk_id"] for row in code}
-                rest = [row for row in rows if row["chunk_id"] not in code_ids]
-                rows = (code + rest)[:top_k]
-        return stats, rows
+                for collection in quotas
+            }
+            rows = [row for collection, quota in quotas.items() for row in ranked[collection][:quota]]
+            spare = [row for collection, quota in quotas.items() for row in ranked[collection][quota:]]
+            rows += sorted(spare, key=_by_score)[:top_k - len(rows)]
+        return stats, sorted(rows, key=_by_score)
 
     def semantic_plan(
         self,

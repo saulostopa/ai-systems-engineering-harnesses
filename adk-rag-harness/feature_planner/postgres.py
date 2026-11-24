@@ -6,6 +6,14 @@ import hashlib
 import sys
 from pathlib import Path
 
+REFERENCE_TOP_K = 4
+
+
+def docs_budget(top_k: int) -> int:
+    """A third of each project's places go to documentation and the rest to code."""
+
+    return top_k // 3
+
 
 class PostgresSearch:
     def __init__(self, project: str, store=None, embedder=None, *, references=(), target_top_k=None):
@@ -31,12 +39,12 @@ class PostgresSearch:
         try:
             vector = self.embed_query(self.embedder, query)
             projects = (self.project, *self.references)
+            budgets = [self.target_top_k, *(REFERENCE_TOP_K for _ in self.references)]
             snapshots = [
                 self.store.planning_snapshot(
-                    project, query, vector, self.model, top_k=self.target_top_k if project == self.project else 4,
-                    code_slots=2 if project in self.references else 0,
+                    project, query, vector, self.model, top_k=top_k, docs_top_k=docs_budget(top_k),
                 )
-                for project in projects
+                for project, top_k in zip(projects, budgets)
             ]
         except (RuntimeError, ValueError, OSError, self.database_error):
             raise OSError("Postgres retrieval or the embedding service failed.") from None
@@ -54,7 +62,7 @@ class PostgresSearch:
 
         baseline = {key: sum(stats[key] for stats in baselines.values()) for key in ("chunks", "utf8_bytes")}
         return evidence, {
-            "backend": "postgres", "project": self.project, "strategy": "hybrid",
+            "backend": "postgres", "project": self.project, "strategy": "hybrid per collection",
             "reference_projects": list(self.references), "project_baselines": baselines,
             "embedding_model": self.model, "retrieved": chunks, "baseline": baseline,
         }
