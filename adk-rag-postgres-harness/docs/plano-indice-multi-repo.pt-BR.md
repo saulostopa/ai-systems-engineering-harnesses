@@ -22,6 +22,8 @@ abaixo rodam a partir de `adk-rag-postgres-harness`.
 - **Primeiro o banco local do Mac.** Um banco gerenciado, como o Supabase ou o oficial,
   entra só depois da varredura de segredos e com a aprovação de quem responde pelos dados.
   A tabela `chunks` guarda o texto do código, não só os vetores.
+- **Decidido em 2026-11-24: opção A.** Até a aprovação, a máquina do trabalho usa um banco
+  local restaurado do dump do Mac (passo 9). O Supabase (passo 10) fica para depois.
 - **Os itens da avaliação da migration não bloqueiam hoje.** Migrations novas se aplicam
   sobre um banco já carregado (veja "Migration").
 
@@ -135,11 +137,15 @@ docker compose exec -T postgres pg_dump -U harness -d harness_rag -Fc > ~/harnes
 ```
 
 O dump contém o código indexado. Trate-o como o próprio código-fonte: nada de pasta
-pública nem nuvem pessoal.
+pública nem nuvem pessoal. Para levá-lo à máquina do trabalho, use um meio aprovado pela
+empresa, como o OneDrive corporativo ou um disco externo criptografado. Os vetores
+comprimem pouco, então o arquivo deve ficar na casa das centenas de MB. Confira o tamanho
+com `ls -lh` e anote o resumo do `index-all.sh` (projetos, trechos e falhas) para a conferência
+de amanhã.
 
 ## Amanhã, na máquina do trabalho
 
-### 9. Opção A, recomendada até a aprovação: banco local novo
+### 9. Opção A, escolhida até a aprovação: banco local novo
 
 1. Restaurar o dump num banco novo, `harness_rag_multi`, no contêiner que já existe. O
    `harness_rag` atual continua intacto.
