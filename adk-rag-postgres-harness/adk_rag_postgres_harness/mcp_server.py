@@ -45,6 +45,33 @@ def _guarded(tool):
     return run
 
 
+class ProjectNotIndexed(ValueError):
+    """The registration names a project its database does not hold."""
+
+
+def check_project(project: str, store: PostgresStore) -> None:
+    """Refuse at startup a server whose project is not in its database.
+
+    Each registration serves one project, so a wrong name or database fails here,
+    where the agent's client shows it, not on the first tool call. An unreachable
+    database is left to the tools, which say how to start it.
+    """
+
+    try:
+        found = store.project(project)
+    except (psycopg.OperationalError, psycopg.errors.UndefinedTable):
+        return
+    if found is None:
+        with store.connect() as conn:
+            names = [row["name"] for row in conn.execute("SELECT name FROM projects ORDER BY name")]
+        database = store.url.rsplit("/", 1)[-1]
+        known = ", ".join(names) or "none"
+        raise ProjectNotIndexed(
+            f"project {project!r} is not indexed in database {database!r} (indexed: {known}). "
+            "Check --project and --database-url, or run the `index` command."
+        )
+
+
 def _top_k(value: int) -> int:
     return max(1, min(value, MAX_TOP_K))
 

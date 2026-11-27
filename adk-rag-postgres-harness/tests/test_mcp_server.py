@@ -22,7 +22,7 @@ from rag_harness.embeddings import NGramEmbedder
 
 try:
     import psycopg
-    from adk_rag_postgres_harness.mcp_server import build_server
+    from adk_rag_postgres_harness.mcp_server import ProjectNotIndexed, build_server, check_project
     from mcp.shared.memory import create_connected_server_and_client_session as connect
 except ImportError:
     psycopg = None
@@ -170,6 +170,19 @@ class McpToolTests(unittest.TestCase):
         result = self._call("find_symbol", name="addToCart")
         self.assertTrue(result.isError)
         self.assertIn("index it first", result.content[0].text)
+
+    def test_startup_accepts_the_indexed_project(self):
+        check_project("shop", self.store)
+
+    def test_startup_refuses_a_project_missing_from_its_database(self):
+        with self.assertRaises(ProjectNotIndexed) as caught:
+            check_project("nope", self.store)
+        message = str(caught.exception)
+        self.assertIn(self.database, message)
+        self.assertIn("indexed: shop", message)
+
+    def test_startup_leaves_an_unreachable_database_to_the_tools(self):
+        check_project("shop", PostgresStore("postgresql://harness:harness@localhost:1/none"))
 
     def test_an_unreachable_database_says_what_to_do(self):
         down = PostgresStore("postgresql://harness:harness@localhost:1/none")
