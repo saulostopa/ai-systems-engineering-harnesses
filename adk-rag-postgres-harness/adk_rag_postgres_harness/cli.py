@@ -15,7 +15,8 @@ def main() -> None:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument(
         "--database-url",
-        help="PostgreSQL connection for this command; replaces DATABASE_URL, so each project can use its own database",
+        help="PostgreSQL connection for this command; replaces DATABASE_URL. One database holds many projects: "
+        "use another one only to keep an organization's code apart",
     )
     parser = argparse.ArgumentParser(prog="adk-rag-postgres-harness")
     sub = parser.add_subparsers(dest="command", required=True)

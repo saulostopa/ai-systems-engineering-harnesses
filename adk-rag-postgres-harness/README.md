@@ -158,49 +158,47 @@ The server gives an agent the same functions as the CLI, without Google ADK:
 
 ### One server per project
 
-A server serves exactly one project: the `--project` name given to `index`, in the
-database given by `--database-url` (default: `DATABASE_URL`, then `harness_rag`).
-Nothing is shared between registrations, so register one server in each repository,
-each with its own project and, when you keep projects apart, its own database. The
-server refuses to start when its project is not in that database, and lists the
-projects it does hold, so a wrong name or database shows in the agent's client
-instead of on the first search.
+One database holds every project. Each table is scoped by project, and the
+`embeddings` table is a cache by content and model, so identical text in two
+projects is embedded once. What separates projects is the server: each one serves
+exactly one project, the `--project` name given to `index`. Register one server in
+each repository, all pointing to the same database. The server refuses to start
+when its project is not in the database, and lists the projects it does hold, so a
+wrong name shows in the agent's client instead of on the first search.
 
 Run `claude mcp add` in the root of each target repository. The `local` scope keeps
 the entry out of Git and ties it to that folder, so every repository can use the
 same server name `code-memory`. Replace `$HARNESS` with the absolute path of this
-folder.
-
-A web storefront, indexed in the default database:
+folder. The three projects below share the default database:
 
 ```bash
+CLI="uv run --directory $HARNESS --extra postgres python -m adk_rag_postgres_harness.cli"
+
 cd ~/code/shop-web
-uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli index ~/code/shop-web --project shop-web
-claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
-  python -m adk_rag_postgres_harness.cli mcp --project shop-web
-```
+$CLI index ~/code/shop-web --project shop-web
+claude mcp add --scope local code-memory -- $CLI mcp --project shop-web
 
-A payments API with a database of its own:
-
-```bash
 cd ~/code/payments-api
-createdb -h localhost -p 5433 -U harness payments   # or psql -c 'CREATE DATABASE payments'
-uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli migrate \
-  --database-url postgresql://harness:harness@localhost:5433/payments
-uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli index ~/code/payments-api \
-  --project payments-api --database-url postgresql://harness:harness@localhost:5433/payments
-claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
-  python -m adk_rag_postgres_harness.cli mcp --project payments-api \
-  --database-url postgresql://harness:harness@localhost:5433/payments
+$CLI index ~/code/payments-api --project payments-api
+claude mcp add --scope local code-memory -- $CLI mcp --project payments-api
+
+cd ~/code/mobile-app
+$CLI index ~/code/mobile-app --project mobile-app
+claude mcp add --scope local code-memory -- $CLI mcp --project mobile-app
 ```
 
-A mobile app that shares a pilot database with its reference projects:
+Use another database only to keep one organization's code apart from another's,
+for example your own projects in `harness_rag` and a company's projects in a
+database of their own that can be backed up or handed over alone. Create it once,
+then pass the same `--database-url` to `migrate`, `index` and every `mcp`
+registration of that organization:
 
 ```bash
-cd ~/code/mobile-app
-claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
-  python -m adk_rag_postgres_harness.cli mcp --project mobile-app \
-  --database-url postgresql://harness:harness@localhost:5433/pilot_mobile
+psql postgresql://harness:harness@localhost:5433/harness_rag -c 'CREATE DATABASE acme'
+ACME=postgresql://harness:harness@localhost:5433/acme
+$CLI migrate --database-url "$ACME"
+$CLI index ~/work/acme-api --project acme-api --database-url "$ACME"
+claude mcp add --scope local code-memory -- $CLI mcp --project acme-api --database-url "$ACME"
 ```
 
 Check each registration from its repository with `claude mcp get code-memory`. It must
