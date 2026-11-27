@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from dataclasses import asdict
 
@@ -11,53 +12,61 @@ from .store import PostgresStore
 
 
 def main() -> None:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--database-url",
+        help="PostgreSQL connection for this command; replaces DATABASE_URL, so each project can use its own database",
+    )
     parser = argparse.ArgumentParser(prog="adk-rag-postgres-harness")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("migrate")
+    def command(name, **kwargs):
+        return sub.add_parser(name, parents=[common], **kwargs)
 
-    index_parser = sub.add_parser("index", help="sync a repository, embedding only what changed")
+    command("migrate")
+
+    index_parser = command("index", help="sync a repository, embedding only what changed")
     index_parser.add_argument("root")
     index_parser.add_argument("--project", help="defaults to the folder name")
     index_parser.add_argument("--move", action="store_true", help="the project now lives in this folder")
 
-    search_parser = sub.add_parser("search", help="search by meaning and text; text comes from disk")
+    search_parser = command("search", help="search by meaning and text; text comes from disk")
     search_parser.add_argument("query")
     search_parser.add_argument("--project", required=True)
     search_parser.add_argument("--collection", choices=("code", "docs"))
     search_parser.add_argument("--top-k", type=int, default=8)
     search_parser.add_argument("--json", action="store_true")
 
-    symbol_parser = sub.add_parser("symbol", help="where a function, component or type is defined")
+    symbol_parser = command("symbol", help="where a function, component or type is defined")
     symbol_parser.add_argument("name")
     symbol_parser.add_argument("--project", required=True)
 
-    uses_parser = sub.add_parser("uses", help="which files import a name or a file path")
+    uses_parser = command("uses", help="which files import a name or a file path")
     uses_parser.add_argument("name")
     uses_parser.add_argument("--project", required=True)
 
-    read_parser = sub.add_parser("read", help="read lines of an indexed file")
+    read_parser = command("read", help="read lines of an indexed file")
     read_parser.add_argument("path")
     read_parser.add_argument("--project", required=True)
     read_parser.add_argument("--start", type=int, default=1)
     read_parser.add_argument("--end", type=int)
 
-    queries_parser = sub.add_parser("queries", help="the questions recorded locally, newest first")
+    queries_parser = command("queries", help="the questions recorded locally, newest first")
     queries_parser.add_argument("--project", required=True)
     queries_parser.add_argument("--limit", type=int, default=50)
     queries_parser.add_argument("--json", action="store_true")
 
-    mcp_parser = sub.add_parser("mcp", help="serve the same tools to an agent over MCP (stdio)")
+    mcp_parser = command("mcp", help="serve the same tools to an agent over MCP (stdio)")
     mcp_parser.add_argument("--project", required=True)
 
-    remember_parser = sub.add_parser("remember", help="save a decision to the repository file and the database")
+    remember_parser = command("remember", help="save a decision to the repository file and the database")
     remember_parser.add_argument("text")
     remember_parser.add_argument("--project", required=True)
     remember_parser.add_argument("--source", required=True, help="where it came from: a file, a PR, a conversation")
     remember_parser.add_argument("--kind", default="note", choices=("decision", "convention", "handoff", "note"))
     remember_parser.add_argument("--supersedes", help="the id of the memory this one replaces")
 
-    recall_parser = sub.add_parser("recall", help="search memories and feature progress and handoff logs")
+    recall_parser = command("recall", help="search memories and feature progress and handoff logs")
     recall_parser.add_argument("query")
     recall_parser.add_argument("--project", required=True)
     recall_parser.add_argument("--kind", choices=("decision", "convention", "handoff", "note", "progress"))
@@ -66,6 +75,8 @@ def main() -> None:
     recall_parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args()
+    if args.database_url:
+        os.environ["DATABASE_URL"] = args.database_url
     from .query_log import log_query
 
     if args.command == "migrate":
@@ -100,9 +111,14 @@ def main() -> None:
         for row in rows:
             print(f"{row['created_at']:%Y-%m-%d %H:%M}  {row['entry']}  {row['tool']}  {row['query'][:80]}")
     elif args.command == "mcp":
-        from .mcp_server import build_server
+        from .mcp_server import ProjectNotIndexed, build_server, check_project
 
-        build_server(args.project).run("stdio")
+        store = PostgresStore()
+        try:
+            check_project(args.project, store)
+        except ProjectNotIndexed as exc:
+            raise SystemExit(str(exc)) from exc
+        build_server(args.project, store=store).run("stdio")
     elif args.command == "remember":
         from .memory import MemoryRefused, remember
 

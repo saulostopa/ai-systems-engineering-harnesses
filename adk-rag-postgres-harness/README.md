@@ -154,18 +154,69 @@ repository's `.gitattributes`.
 ## MCP server
 
 The server gives an agent the same functions as the CLI, without Google ADK:
-`search_code`, `find_symbol`, `read_lines`, `remember` and `recall`. Each server
-serves one indexed project. To register it for Claude Code, run this in the target
-repository; the `local` scope keeps it out of Git, because the path is yours:
+`search_code`, `find_symbol`, `read_lines`, `remember` and `recall`.
+
+### One server per project
+
+A server serves exactly one project: the `--project` name given to `index`, in the
+database given by `--database-url` (default: `DATABASE_URL`, then `harness_rag`).
+Nothing is shared between registrations, so register one server in each repository,
+each with its own project and, when you keep projects apart, its own database. The
+server refuses to start when its project is not in that database, and lists the
+projects it does hold, so a wrong name or database shows in the agent's client
+instead of on the first search.
+
+Run `claude mcp add` in the root of each target repository. The `local` scope keeps
+the entry out of Git and ties it to that folder, so every repository can use the
+same server name `code-memory`. Replace `$HARNESS` with the absolute path of this
+folder.
+
+A web storefront, indexed in the default database:
 
 ```bash
-claude mcp add --scope local code-memory -- uv run --directory /path/to/adk-rag-postgres-harness \
-  --extra postgres python -m adk_rag_postgres_harness.cli mcp --project my-repo
+cd ~/code/shop-web
+uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli index ~/code/shop-web --project shop-web
+claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
+  python -m adk_rag_postgres_harness.cli mcp --project shop-web
 ```
 
-`agy mcp add` takes the same command, but its setting applies to every repository. In headless
-agy, allow the tools for the session with `--settings`, such as `mcp(code-memory/search_code)`.
-Claude Code and agy have been tested. `codex mcp add` should also work, but it has not been tested.
+A payments API with a database of its own:
+
+```bash
+cd ~/code/payments-api
+createdb -h localhost -p 5433 -U harness payments   # or psql -c 'CREATE DATABASE payments'
+uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli migrate \
+  --database-url postgresql://harness:harness@localhost:5433/payments
+uv run --directory "$HARNESS" --extra postgres python -m adk_rag_postgres_harness.cli index ~/code/payments-api \
+  --project payments-api --database-url postgresql://harness:harness@localhost:5433/payments
+claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
+  python -m adk_rag_postgres_harness.cli mcp --project payments-api \
+  --database-url postgresql://harness:harness@localhost:5433/payments
+```
+
+A mobile app that shares a pilot database with its reference projects:
+
+```bash
+cd ~/code/mobile-app
+claude mcp add --scope local code-memory -- uv run --directory "$HARNESS" --extra postgres \
+  python -m adk_rag_postgres_harness.cli mcp --project mobile-app \
+  --database-url postgresql://harness:harness@localhost:5433/pilot_mobile
+```
+
+Check each registration from its repository with `claude mcp get code-memory`. It must
+show this folder's current path: after moving the harness, register every repository
+again, because a server whose `--directory` no longer exists does not start.
+
+Keep `HARNESS_EMBED_PROVIDER` and `HARNESS_EMBED_MODEL` equal to the ones used by
+`index`. When a project was indexed with other values, pass them to that server with
+`claude mcp add -e HARNESS_EMBED_MODEL=... code-memory -- ...`.
+
+`agy mcp add` and `codex mcp add` take the same command, but their settings apply to
+every repository. Give each project its own server name there, such as
+`code-memory-shop-web`, so one project's server is never used in another repository.
+In headless agy, allow the tools for the session with `--settings`, such as
+`mcp(code-memory-shop-web/search_code)`. Claude Code and agy have been tested;
+`codex mcp add` has not.
 
 - **Always loaded:** the tools set `anthropic/alwaysLoad`. Otherwise Claude Code hides
   them behind its tool search, and the agent uses grep without ever seeing them.
