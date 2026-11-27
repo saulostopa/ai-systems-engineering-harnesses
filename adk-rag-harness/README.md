@@ -285,7 +285,15 @@ Example `.ragignore` patterns, to adapt to the pilot repository:
 
 Set `HARNESS_PLANNER_RAG_TARGET_TOP_K` to choose the target evidence budget
 from 1 to 16 chunks without changing the reference budgets. The default is
-4 with references and 6 for target-only retrieval.
+4 with references and 6 for target-only retrieval. Each reference gets 4.
+
+Each project's budget is split by collection. A third, rounded down, goes
+to documentation and the rest to code, and each collection is ranked on its
+own with hybrid search. Ranked together, full text lifted long README
+sections above the code that a feature changes. A collection with too few
+results gives its places to the other, so a documentation-only reference
+still fills its budget. With a budget of 1 or 2, every place goes to code
+first.
 
 The receipt identifies an indexed chunk by project, relative path, line range
 and hashes. Reindex after changing the pilot revision. If a CLI route is

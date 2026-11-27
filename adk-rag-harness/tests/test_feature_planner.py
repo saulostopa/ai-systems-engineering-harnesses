@@ -161,14 +161,14 @@ class FeaturePlannerTests(unittest.IsolatedAsyncioTestCase):
         from feature_planner.postgres import PostgresSearch
 
         class SnapshotStore:
-            def planning_snapshot(self, project, query, vector, model, top_k, *, code_slots=0):
+            def planning_snapshot(self, project, query, vector, model, top_k, *, docs_top_k=0):
                 row = {
                     "path": "app.py" if project == "catalog" else "reference.py",
                     "indexed_text": project, "start_line": 1, "end_line": 2,
                     "chunk_id": 1, "content_hash": "chunk", "file_hash": "file",
                     "embedding_dimensions": 1024, "semantic_rank": 1, "lexical_rank": 1,
                 }
-                self.calls.append((project, query, vector, model, top_k, code_slots))
+                self.calls.append((project, query, vector, model, top_k, docs_top_k))
                 return {"chunks": 1, "utf8_bytes": len(project)}, [row]
 
             calls = []
@@ -184,7 +184,9 @@ class FeaturePlannerTests(unittest.IsolatedAsyncioTestCase):
             evidence, receipt = search("port SDK")
         embed.assert_called_once()
         self.assertEqual([call[0] for call in store.calls], ["catalog", "fipe", "harness"])
-        self.assertEqual([call[-2:] for call in store.calls], [(10, 0), (4, 2), (4, 2)])
+        # A third of each budget, rounded down, is kept for documentation.
+        self.assertEqual([call[-2:] for call in store.calls], [(10, 3), (4, 1), (4, 1)])
+        self.assertEqual(receipt["strategy"], "hybrid per collection")
         self.assertEqual([chunk["origin"] for chunk in receipt["retrieved"]], ["target", "reference", "reference"])
         self.assertEqual(receipt["baseline"]["chunks"], 3)
         self.assertEqual(receipt["project_baselines"]["fipe"]["chunks"], 1)
